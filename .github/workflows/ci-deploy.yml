@@ -36,9 +36,13 @@ jobs:
         working-directory: hardhat
         run: npx hardhat compile
 
-      - name: Deploy contracts using Ignition
+      - name: Deploy contracts using Ignition and capture address
         working-directory: hardhat
-        run: npx hardhat ignition deploy ./ignition/modules/Lock.js --network localhost
+        run: |
+          ADDRESS=$(npx hardhat ignition deploy ./ignition/modules/Lock.js --network localhost | grep -oP '0x[a-fA-F0-9]{40}' | head -1)
+          echo "LOCK_ADDRESS=$ADDRESS" >> $GITHUB_ENV
+          echo "Lock contract deployed at: $ADDRESS"
+
 
       - name: Commit container as new image with contracts
         run: |
