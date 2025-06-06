@@ -26,13 +26,6 @@ jobs:
               --http --http.addr 0.0.0.0 --http.port 8545 \
               --http.api eth,net,web3,personal \
 
-      - name: Show dev account used by Geth
-        run: |
-          echo "🔍 Listing dev accounts inside Geth container..."
-          docker exec geth-devnet geth --exec "eth.accounts" attach http://localhost:8545
-
-
-
 
       - name: Wait for Geth RPC to be available
         run: |
@@ -46,6 +39,11 @@ jobs:
             sleep 3
           done
           curl -s http://localhost:8545 || (echo "❌ Geth RPC did not respond" && exit 1)
+
+      - name: Show dev account used by Geth
+        run: |
+          echo "🔍 Listing dev accounts inside Geth container..."
+          docker exec geth-devnet geth --exec "eth.accounts" attach http://localhost:8545
 
       - name: Check Hardhat directory structure
         run: |
