@@ -17,7 +17,7 @@ jobs:
 
       - name: Start Geth devnet container
         run: |
-          echo "🚀 Starting Geth devnet container..."
+          echo " Starting Geth devnet container..."
           docker run -d --name geth-devnet -p 8545:8545 \
             ghcr.io/${{ github.repository_owner }}/go-ethereum:dev-latest \
             geth --http --http.addr 0.0.0.0 --http.port 8545 \
@@ -40,39 +40,46 @@ jobs:
 
       - name: Check Hardhat directory structure
         run: |
-          echo "📁 Verifying hardhat project structure..."
+          echo " Verifying hardhat project structure..."
           ls -R hardhat
 
       - name: Install Hardhat dependencies
         working-directory: hardhat
         run: |
-          echo "📦 Installing dependencies..."
+          echo " Installing dependencies..."
           npm install
 
       - name: Compile contracts
         working-directory: hardhat
         run: |
-          echo "🛠️ Compiling contracts..."
+          echo " Compiling contracts..."
           npx hardhat compile
 
       - name: Deploy contracts using Ignition
         working-directory: hardhat
         run: |
-          echo "🚀 Deploying contracts..."
-          npx hardhat ignition deploy ./ignition/modules/Lock.js --network localhost
+          echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network localhost
 
-      - name: Debug deployed contract state (optional)
+
+      - name:  Check Geth devnet chain info
         run: |
-          echo "🔍 Checking Geth devnet state after deployment..."
-          docker exec geth-devnet geth attach --exec "eth.accounts"
-          docker exec geth-devnet geth attach --exec "eth.getBlock('latest')"
+          echo "Chain ID:"
+          curl -s -X POST http://localhost:8545 \
+            -H "Content-Type: application/json" \
+            -d '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}'
+
 
       - name: Commit container as new image with contracts
         run: |
-          echo "📦 Committing container to image: devnet-with-contracts"
+          echo " Committing container to image: devnet-with-contracts"
           docker ps
           docker commit geth-devnet ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
           docker images
+
+      - name: 🚦 Debug Geth RPC
+        run: |
+          curl -s http://localhost:8545
+
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -83,5 +90,5 @@ jobs:
 
       - name: Push new image
         run: |
-          echo "🚢 Pushing image to GHCR..."
+          echo " Pushing image to GHCR..."
           docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
