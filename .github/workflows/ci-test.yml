@@ -1,26 +1,30 @@
-name: Test Against Deployed Devnet
+name: Run Hardhat Tests
 
 on:
-  workflow_dispatch:
+  pull_request:
+    types: [closed]
 
 jobs:
-  test_contracts:
+  run_tests:
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'CI:Test')
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Pull devnet-with-contracts image
+      - name: Pull pre-deployed Geth image
         run: docker pull ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
 
-      - name: Start devnet-with-contracts container
+      - name: Start devnet with deployed contracts
         run: |
-          docker run -d --name geth-devnet-test -p 8545:8545 \
+          docker run -d --name devnet -p 8545:8545 \
             ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts \
-            geth --http --http.addr 0.0.0.0 --http.port 8545 --http.api eth,net,web3 --dev
+            geth --http --http.addr 0.0.0.0 --http.port 8545 \
+                 --http.api eth,net,web3,txpool,personal \
+                 --dev --datadir /data
 
-      - name: Wait for Geth RPC to be ready
+      - name: Wait for Geth to be ready
         run: |
           for i in {1..10}; do
             curl -s http://localhost:8545 && break
@@ -31,6 +35,6 @@ jobs:
         working-directory: hardhat
         run: npm install
 
-      - name: Run Hardhat tests against devnet-with-contracts
+      - name: Run Hardhat tests against devnet
         working-directory: hardhat
-        run: npx hardhat test --network localhost
+        run: npx hardhat test --network devnet
