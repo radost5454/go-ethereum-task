@@ -17,13 +17,15 @@ jobs:
 
       - name: Start Geth devnet container
         run: |
-          echo " Starting Geth devnet container..."
+          echo "Starting Geth devnet container..."
           docker run -d --name geth-devnet -p 8545:8545 \
             ghcr.io/${{ github.repository_owner }}/go-ethereum:dev-latest \
-            geth --http --http.addr 0.0.0.0 --http.port 8545 \
-                 --http.api eth,net,web3,personal \
-                 --dev
-          docker ps -a
+            geth \
+              --dev \
+              --datadir /tmp/devdatadir \
+              --http --http.addr 0.0.0.0 --http.port 8545 \
+              --http.api eth,net,web3,personal \
+
 
       - name: Wait for Geth RPC to be available
         run: |
