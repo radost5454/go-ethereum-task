@@ -14,7 +14,7 @@ jobs:
       - name: Pull pre-deployed Geth image
         run: docker pull ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
 
-      - name: Start devnet with deployed contracts
+      - name: Start Geth devnet with deployed contracts
         run: |
           docker run -d --name devnet -p 8545:8545 \
             ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts \
@@ -22,20 +22,22 @@ jobs:
                  --http.api eth,net,web3,txpool,personal \
                  --dev --datadir /data
 
-      - name: Wait for Geth to be ready
+      - name: Wait for Geth
         run: |
           for i in {1..10}; do
             curl -s http://localhost:8545 && break
             echo "Waiting for Geth RPC..." && sleep 3
           done
 
-      - name: Install Hardhat dependencies
-        working-directory: hardhat
-        run: npm install
+      - name: Download deployed address artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: lock-address
 
-      - name: Run Hardhat tests against predeployed contract
+      - name: Export LOCK_ADDRESS env variable
+        run: echo "LOCK_ADDRESS=$(cat lock-address.txt)" >> $GITHUB_ENV
+
+      - name: Run Hardhat test against predeployed contract
         working-directory: hardhat
-        env:
-          LOCK_ADDRESS: ${{ secrets.LOCK_ADDRESS }}
         run: |
           npx hardhat test test/checkPredeployed.js --network devnet
