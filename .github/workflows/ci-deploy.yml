@@ -103,11 +103,15 @@ jobs:
           name: lock-address
 
       - name: Set LOCK_ADDRESS env variable
-        run: echo "LOCK_ADDRESS=$(cat lock-address.txt)" >> $GITHUB_ENV
+        run: echo "LOCK_ADDRESS=$(cat lock-address/lock-address.txt)" >> $GITHUB_ENV
 
       - name: Install Hardhat dependencies
         working-directory: hardhat
         run: npm install
+
+      - name: Debug: Print loaded contract address
+        run: echo "Using contract at $LOCK_ADDRESS"
+
 
       - name: Run Hardhat test on predeployed contract
         working-directory: hardhat
