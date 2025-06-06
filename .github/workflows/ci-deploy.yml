@@ -130,5 +130,8 @@ jobs:
 
       - name: Run Hardhat test on predeployed contract
         working-directory: hardhat
+        env:
+          LOCK_ADDRESS: ${{ env.LOCK_ADDRESS }}
         run: |
+          echo "Using LOCK_ADDRESS=$LOCK_ADDRESS"
           npx hardhat test test/checkPredeployed.js --network devnet
