@@ -66,9 +66,7 @@ jobs:
         working-directory: hardhat
         run: |
           echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js \
-            --network localhost \
-            --deployer 0x71562b71999873db5b286df957af199ec94617f7
-
+            --network localhost 
 
 
       - name:  Check Geth devnet chain info
