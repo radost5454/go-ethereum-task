@@ -109,7 +109,7 @@ jobs:
         working-directory: hardhat
         run: npm install
 
-      - name: Debug: Print loaded contract address
+      - name:  Print loaded contract address
         run: echo "Using contract at $LOCK_ADDRESS"
 
 
