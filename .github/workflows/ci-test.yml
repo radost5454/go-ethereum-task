@@ -33,6 +33,10 @@ jobs:
         working-directory: hardhat
         run: npm install
 
-      - name: Run Hardhat tests against devnet
+      - name: Run Hardhat tests against predeployed contract
         working-directory: hardhat
-        run: npx hardhat test --network devnet
+        env:
+          LOCK_ADDRESS: ${{ secrets.LOCK_ADDRESS }}
+        run: |
+          npm install
+          npx hardhat test test/checkPredeployed.js --network devnet
