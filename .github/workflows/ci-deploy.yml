@@ -1,12 +1,14 @@
 name: Deploy Contracts to Devnet
 
 on:
-  pull_request:
-    types: [closed]
+  # pull_request:
+  #   types: [closed]
+  workflow_dispatch:
+
 
 jobs:
   deploy_contracts:
-    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'CI:Deploy')
+    # if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'CI:Deploy')
     runs-on: ubuntu-latest
 
     steps:
@@ -15,32 +17,62 @@ jobs:
 
       - name: Start Geth devnet container
         run: |
+          echo "🚀 Starting Geth devnet container..."
           docker run -d --name geth-devnet -p 8545:8545 \
             ghcr.io/${{ github.repository_owner }}/go-ethereum:dev-latest \
-            geth --http --http.addr 0.0.0.0 --http.port 8545 --http.api eth,net,web3 --dev
+            geth --http --http.addr 0.0.0.0 --http.port 8545 \
+                 --http.api eth,net,web3,personal \
+                 --dev
+          docker ps -a
 
       - name: Wait for Geth RPC to be available
         run: |
+          echo "⌛ Waiting for Geth RPC..."
           for i in {1..10}; do
-            curl -s http://localhost:8545 && break
-            echo "Waiting for Geth RPC..." && sleep 3
+            if curl -s http://localhost:8545 >/dev/null; then
+              echo "✅ Geth RPC is up!"
+              break
+            fi
+            echo "⏳ Still waiting for Geth RPC..."
+            sleep 3
           done
+          curl -s http://localhost:8545 || (echo "❌ Geth RPC did not respond" && exit 1)
+
+      - name: Check Hardhat directory structure
+        run: |
+          echo "📁 Verifying hardhat project structure..."
+          ls -R hardhat
 
       - name: Install Hardhat dependencies
         working-directory: hardhat
-        run: npm install
+        run: |
+          echo "📦 Installing dependencies..."
+          npm install
 
       - name: Compile contracts
         working-directory: hardhat
-        run: npx hardhat compile
+        run: |
+          echo "🛠️ Compiling contracts..."
+          npx hardhat compile
 
       - name: Deploy contracts using Ignition
         working-directory: hardhat
-        run: npx hardhat ignition deploy ./ignition/modules/Lock.js --network localhost
+        run: |
+          echo "🚀 Deploying contracts..."
+          npx hardhat ignition deploy ./ignition/modules/Lock.js --network localhost
+
+      - name: Debug deployed contract state (optional)
+        run: |
+          echo "🔍 Checking Geth devnet state after deployment..."
+          docker exec geth-devnet geth attach --exec "eth.accounts"
+          docker exec geth-devnet geth attach --exec "eth.getBlock('latest')"
 
       - name: Commit container as new image with contracts
         run: |
+          echo "📦 Committing container to image: devnet-with-contracts"
+          docker ps
           docker commit geth-devnet ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+          docker images
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -50,4 +82,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push new image
-        run: docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+        run: |
+          echo "🚢 Pushing image to GHCR..."
+          docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
