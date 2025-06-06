@@ -38,5 +38,4 @@ jobs:
         env:
           LOCK_ADDRESS: ${{ secrets.LOCK_ADDRESS }}
         run: |
-          npm install
           npx hardhat test test/checkPredeployed.js --network devnet
