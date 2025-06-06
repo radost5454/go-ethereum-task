@@ -1,4 +1,4 @@
-name: Deploy Contracts to Devnet
+name: Deploy and Test Contracts
 
 on:
   pull_request:
@@ -9,11 +9,18 @@ jobs:
     if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'CI:Deploy')
     runs-on: ubuntu-latest
 
+    outputs:
+      image_tag: ${{ steps.set_output.outputs.image_tag }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Start Geth devnet container
+      - name: Set image tag
+        id: set_output
+        run: echo "image_tag=devnet-with-contracts" >> $GITHUB_OUTPUT
+
+      - name: Start Geth devnet
         run: |
           docker run -d --name geth-devnet -p 8545:8545 \
             ghcr.io/${{ github.repository_owner }}/go-ethereum:dev-latest \
@@ -36,16 +43,22 @@ jobs:
         working-directory: hardhat
         run: npx hardhat compile
 
-      - name: Deploy contracts using Ignition
+      - name: Deploy contracts using Ignition and save address
         working-directory: hardhat
         run: |
           ADDRESS=$(npx hardhat ignition deploy ./ignition/modules/Lock.js --network localhost | grep -oP '0x[a-fA-F0-9]{40}' | head -1)
-          echo $ADDRESS > ../lock-address.txt
           echo "Deployed contract address: $ADDRESS"
+          echo $ADDRESS > ../lock-address.txt
+
+      - name: Upload contract address
+        uses: actions/upload-artifact@v4
+        with:
+          name: lock-address
+          path: lock-address.txt
 
       - name: Commit container with deployed contracts
         run: |
-          docker commit geth-devnet ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+          docker commit geth-devnet ghcr.io/${{ github.repository_owner }}/go-ethereum:${{ steps.set_output.outputs.image_tag }}
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -54,11 +67,49 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push image
-        run: docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+      - name: Push devnet-with-contracts image
+        run: docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:${{ steps.set_output.outputs.image_tag }}
 
-      - name: Upload contract address as artifact
-        uses: actions/upload-artifact@v4
+
+  test_contracts:
+    needs: deploy_contracts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Pull predeployed image
+        run: docker pull ghcr.io/${{ github.repository_owner }}/go-ethereum:${{ needs.deploy_contracts.outputs.image_tag }}
+
+      - name: Start devnet with predeployed contracts
+        run: |
+          docker run -d --name geth-test -p 8545:8545 \
+            ghcr.io/${{ github.repository_owner }}/go-ethereum:${{ needs.deploy_contracts.outputs.image_tag }} \
+            geth --http --http.addr 0.0.0.0 --http.port 8545 \
+                 --http.api eth,net,web3,txpool,personal \
+                 --dev --datadir /data
+
+      - name: Wait for Geth
+        run: |
+          for i in {1..10}; do
+            curl -s http://localhost:8545 && break
+            echo "Waiting for Geth..." && sleep 3
+          done
+
+      - name: Download contract address
+        uses: actions/download-artifact@v4
         with:
           name: lock-address
-          path: lock-address.txt
+
+      - name: Set LOCK_ADDRESS env variable
+        run: echo "LOCK_ADDRESS=$(cat lock-address.txt)" >> $GITHUB_ENV
+
+      - name: Install Hardhat dependencies
+        working-directory: hardhat
+        run: npm install
+
+      - name: Run Hardhat test on predeployed contract
+        working-directory: hardhat
+        run: |
+          npx hardhat test test/checkPredeployed.js --network devnet
