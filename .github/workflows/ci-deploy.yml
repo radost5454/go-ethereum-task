@@ -1,10 +1,14 @@
 name: Deploy Contracts to Devnet
 
 on:
+  # pull_request:
+  #   types: [closed]
   workflow_dispatch:
+
 
 jobs:
   deploy_contracts:
+    # if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'CI:Deploy')
     runs-on: ubuntu-latest
 
     steps:
@@ -20,7 +24,8 @@ jobs:
               --dev \
               --datadir /tmp/devdatadir \
               --http --http.addr 0.0.0.0 --http.port 8545 \
-              --http.api eth,net,web3,personal
+              --http.api eth,net,web3,personal \
+
 
       - name: Wait for Geth RPC to be available
         run: |
@@ -35,75 +40,55 @@ jobs:
           done
           curl -s http://localhost:8545 || (echo "❌ Geth RPC did not respond" && exit 1)
 
-      - name: Show Geth dev account and balance
+      - name: Show dev account used by Geth
         run: |
-          echo "🔍 Listing dev accounts and balances inside Geth container..."
+          echo "🔍 Listing dev accounts inside Geth container..."
           docker exec geth-devnet geth --exec "eth.accounts" attach http://localhost:8545
-          docker exec geth-devnet geth --exec "eth.getBalance(eth.accounts[0])" attach http://localhost:8545
 
       - name: Check Hardhat directory structure
         run: |
-          echo "📁 Verifying hardhat project structure..."
+          echo " Verifying hardhat project structure..."
           ls -R hardhat
 
       - name: Install Hardhat dependencies
         working-directory: hardhat
         run: |
-          echo "📦 Installing dependencies..."
+          echo " Installing dependencies..."
           npm install
 
       - name: Compile contracts
         working-directory: hardhat
         run: |
-          echo "🔨 Compiling contracts..."
+          echo " Compiling contracts..."
           npx hardhat compile
-
-      - name: Debug Hardhat deployer account and balance
-        working-directory: hardhat
-        env:
-          HARDHAT_DEPLOYER_KEY: "0x4f3edf983ac636a65a842ce7c78d9aa706d3b113b37a2a85c6e4b8fdc5b8a7e6"
-        run: |
-          echo "🔎 Checking deployer address and balance..."
-          echo "Using deployer key: $HARDHAT_DEPLOYER_KEY"
-          echo "Running balance check with Hardhat..."
-          echo "
-          const { ethers } = require('hardhat');
-          (async () => {
-            const signer = (await ethers.getSigners())[0];
-            const balance = await signer.getBalance();
-            console.log('Deployer address:', signer.address);
-            console.log('Deployer balance:', ethers.utils.formatEther(balance), 'ETH');
-          })();
-          " > check-balance.js
-          npx hardhat run check-balance.js --network localhost
-
 
       - name: Deploy contracts using Ignition
         working-directory: hardhat
         env:
           HARDHAT_DEPLOYER_KEY: "0x4f3edf983ac636a65a842ce7c78d9aa706d3b113b37a2a85c6e4b8fdc5b8a7e6"
         run: |
-          echo "🚀 Deploying contracts using Ignition..."
           echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network localhost
 
-      - name: Check Geth devnet chain info
+
+      - name:  Check Geth devnet chain info
         run: |
-          echo "🧾 Chain ID:"
+          echo "Chain ID:"
           curl -s -X POST http://localhost:8545 \
             -H "Content-Type: application/json" \
             -d '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}'
 
+
       - name: Commit container as new image with contracts
         run: |
-          echo "📦 Committing container to image: devnet-with-contracts"
+          echo " Committing container to image: devnet-with-contracts"
           docker ps
           docker commit geth-devnet ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
           docker images
 
-      - name: Debug Geth RPC again
+      - name: 🚦 Debug Geth RPC
         run: |
-          echo "📡 Checking RPC..."
           curl -s http://localhost:8545
+
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -114,5 +99,5 @@ jobs:
 
       - name: Push new image
         run: |
-          echo "📤 Pushing image to GHCR..."
+          echo " Pushing image to GHCR..."
           docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
