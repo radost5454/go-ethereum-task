@@ -7,7 +7,6 @@ module.exports = {
   networks: {
     localhost: {
       url: "http://localhost:8545",
-      accounts: DEPLOYER_KEY ? [DEPLOYER_KEY] : [],
     },
   },
 };

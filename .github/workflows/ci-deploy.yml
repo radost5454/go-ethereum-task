@@ -64,8 +64,6 @@ jobs:
 
       - name: Deploy contracts using Ignition
         working-directory: hardhat
-        env:
-          HARDHAT_DEPLOYER_KEY: "0x4f3edf983ac636a65a842ce7c78d9aa706d3b113b37a2a85c6e4b8fdc5b8a7e6"
         run: |
           echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network localhost
 
