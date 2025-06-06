@@ -46,11 +46,17 @@ jobs:
         working-directory: hardhat
         run: npx hardhat compile
 
-      - name: Deploy contracts using Ignition and print output
+      - name: Deploy contracts using Ignition and save address
         working-directory: hardhat
         run: |
-          echo "==== Ignition deploy raw output ===="
-          npx hardhat ignition deploy ./ignition/modules/Lock.js --network localhost
+          ADDRESS=$(npx hardhat ignition deploy ./ignition/modules/Lock.js --network localhost --yes | grep -oP '0x[a-fA-F0-9]{40}' | head -1)
+          echo "Deployed contract address: $ADDRESS"
+          if [[ -z "$ADDRESS" ]]; then
+            echo "❌ Deployment failed. No contract address found." >&2
+            exit 1
+          fi
+          echo "$ADDRESS" > ../lock-address.txt
+
 
 
       - name: Upload contract address
