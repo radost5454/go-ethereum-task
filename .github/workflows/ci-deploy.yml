@@ -75,7 +75,8 @@ jobs:
             console.log('Deployer balance:', ethers.utils.formatEther(balance), 'ETH');
           })();
           " > check-balance.js
-          node check-balance.js
+          npx hardhat run check-balance.js --network localhost
+
 
       - name: Deploy contracts using Ignition
         working-directory: hardhat
