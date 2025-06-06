@@ -36,15 +36,14 @@ jobs:
         working-directory: hardhat
         run: npx hardhat compile
 
-      - name: Deploy contracts using Ignition and capture address
+      - name: Deploy contracts using Ignition
         working-directory: hardhat
         run: |
           ADDRESS=$(npx hardhat ignition deploy ./ignition/modules/Lock.js --network localhost | grep -oP '0x[a-fA-F0-9]{40}' | head -1)
-          echo "LOCK_ADDRESS=$ADDRESS" >> $GITHUB_ENV
-          echo "Lock contract deployed at: $ADDRESS"
+          echo $ADDRESS > ../lock-address.txt
+          echo "Deployed contract address: $ADDRESS"
 
-
-      - name: Commit container as new image with contracts
+      - name: Commit container with deployed contracts
         run: |
           docker commit geth-devnet ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
 
@@ -55,5 +54,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push new image
+      - name: Push image
         run: docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+
+      - name: Upload contract address as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: lock-address
+          path: lock-address.txt
