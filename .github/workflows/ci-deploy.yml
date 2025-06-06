@@ -65,7 +65,7 @@ jobs:
       - name: Deploy contracts using Ignition
         working-directory: hardhat
         run: |
-          echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js \
+          echo "yes" | npx hardhat  deploy ./ignition/modules/Lock.js \
             --network localhost 
 
 
