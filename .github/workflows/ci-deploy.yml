@@ -26,6 +26,13 @@ jobs:
               --http --http.addr 0.0.0.0 --http.port 8545 \
               --http.api eth,net,web3,personal \
 
+      - name: Show dev account used by Geth
+        run: |
+          echo "🔍 Listing dev accounts inside Geth container..."
+          docker exec geth-devnet geth --exec "eth.accounts" attach http://localhost:8545
+
+
+
 
       - name: Wait for Geth RPC to be available
         run: |
