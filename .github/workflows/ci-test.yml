@@ -6,7 +6,6 @@ on:
 
 jobs:
   run_tests:
-    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'CI:Test')
     runs-on: ubuntu-latest
 
     steps:
