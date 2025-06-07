@@ -46,11 +46,10 @@ jobs:
         run: |
           npm install
 
-      - name: 🔎 Debug Hardhat config and confirm deployer address
+      - name: 👤 Check active signer
         working-directory: hardhat
-        run: |
-          echo "Configured Hardhat accounts:"
-          node -e "console.log(require('./hardhat.config.js').networks.geth.accounts)"
+        run: npx hardhat accounts:get --network geth
+
 
 
       - name: 🔨 Compile contracts
