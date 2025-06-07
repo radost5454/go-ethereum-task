@@ -80,14 +80,14 @@ jobs:
 
 
 
-      - name: Deploy with Ignition and save address
+      - name: Deploy contracts using Ignition and extract address
         working-directory: hardhat
         env:
           HARDHAT_DEPLOYER_KEY: "0x59c6995e998f97a5a004497e5da0da3eb20c29e0cde8c3c2d20c3eab366d8e84"
         run: |
-          echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth --json > ignition-output.json
-          jq -r '.results["LockModule#Lock"].address' ignition-output.json > deployed-lock-address.txt
-          cp deployed-lock-address.txt ../
+          echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth
+          jq -r '.deployments.Lock.address' deployments/geth/LockModule.json > ../deployed-lock-address.txt
+
 
 
 
