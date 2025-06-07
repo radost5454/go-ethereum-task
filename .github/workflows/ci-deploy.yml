@@ -23,7 +23,10 @@ jobs:
               --dev \
               --datadir /tmp/devdatadir \
               --http --http.addr 0.0.0.0 --http.port 8545 \
-              --http.api eth,net,web3,personal 
+              --http.api eth,net,web3,personal \
+              --mine --miner.threads=1 --miner.etherbase=0x71562b71999873db5b286df957af199ec94617f7
+
+
 
       - name: Wait for Geth RPC to be available
         run: |
@@ -71,11 +74,6 @@ jobs:
           sleep 5
 
 
-      - name: 🧱 Manually mine 1 block
-        run: |
-          echo "⛏️ Manually mining a block to process pending txs..."
-          curl -X POST --data '{"jsonrpc":"2.0","method":"evm_mine","params":[],"id":1}' \
-               -H "Content-Type: application/json" localhost:8545
 
       - name: Deploy contracts using Ignition
         working-directory: hardhat
