@@ -60,6 +60,15 @@ jobs:
           echo " Compiling contracts..."
           npx hardhat compile
 
+      - name: 💸 Fund the deployer from Geth default account
+        run: |
+          echo "Funding deployer..."
+          docker exec geth-devnet geth --exec "eth.sendTransaction({
+            from: eth.accounts[0],
+            to: '0xe260c22167D6e68FDc9d465C3751c1224a3962D3',
+            value: web3.toWei(100, 'ether')
+          })" attach http://localhost:8545
+          sleep 5
 
 
       - name: Deploy contracts using Ignition
