@@ -78,18 +78,12 @@ jobs:
           docker exec geth-devnet geth --exec "eth.blockNumber" attach http://localhost:8545
 
 
-
-
-      - name: Deploy contracts using Ignition and extract address
+      - name: Deploy contracts using Ignition
         working-directory: hardhat
         env:
           HARDHAT_DEPLOYER_KEY: "0x59c6995e998f97a5a004497e5da0da3eb20c29e0cde8c3c2d20c3eab366d8e84"
         run: |
-          echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth
-          jq -r '.deployments.Lock.address' deployments/geth/LockModule.json > ../deployed-lock-address.txt
-
-
-
+          echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth --verbose
 
       - name:  Check Geth devnet chain info
         run: |
@@ -121,8 +115,3 @@ jobs:
           echo " Pushing image to GHCR..."
           docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
 
-      - name: Save contract address as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: deployed-lock-address
-          path: deployed-lock-address.txt
