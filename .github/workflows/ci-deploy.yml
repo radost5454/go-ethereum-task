@@ -71,19 +71,15 @@ jobs:
           })" attach http://localhost:8545
           sleep 5
 
-      - name: ⏱ Wait for block to confirm funding
+      - name: 🪄 Trigger mining by sending dummy tx
         run: |
-          echo "Waiting for block with funding..."
-          for i in {1..10}; do
-            BAL=$(docker exec geth-devnet geth --exec "eth.getBalance('0xe260c22167D6e68FDc9d465C3751c1224a3962D3')" attach http://localhost:8545)
-            echo "Balance: $BAL"
-            if [ "$BAL" != "0" ]; then
-              echo "✅ Funding confirmed."
-              break
-            fi
-            echo "⏳ Still waiting..."
-            sleep 2
-          done
+          echo "Sending dummy tx to mine block..."
+          docker exec geth-devnet geth --exec "eth.sendTransaction({
+            from: eth.accounts[0],
+            to: eth.accounts[0],
+            value: 1
+          })" attach http://localhost:8545
+          sleep 3
 
 
       - name: Deploy contracts using Ignition
