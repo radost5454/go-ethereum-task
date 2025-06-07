@@ -71,6 +71,12 @@ jobs:
           sleep 5
 
 
+      - name: 🧱 Manually mine 1 block
+        run: |
+          echo "⛏️ Manually mining a block to process pending txs..."
+          curl -X POST --data '{"jsonrpc":"2.0","method":"evm_mine","params":[],"id":1}' \
+               -H "Content-Type: application/json" localhost:8545
+
       - name: Deploy contracts using Ignition
         working-directory: hardhat
         env:
