@@ -1,7 +1,7 @@
 require("@nomicfoundation/hardhat-toolbox");
 
 module.exports = {
-  solidity: "0.8.24",
+  solidity: "0.8.28",
   networks: {
     geth: {
       url: "http://localhost:8545",
