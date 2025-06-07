@@ -23,7 +23,8 @@ jobs:
               --dev \
               --datadir /tmp/devdatadir \
               --http --http.addr 0.0.0.0 --http.port 8545 \
-              --http.api eth,net,web3,personal
+              --http.api eth,net,web3,personal \
+              --mine --miner.threads=1 --miner.gaslimit=12000000
 
       - name: Wait for Geth RPC to be available
         run: |
