@@ -33,6 +33,11 @@ jobs:
           done
           curl -s http://localhost:8545 || (echo "❌ Geth RPC did not respond" && exit 1)
 
+      - name: 🧾 Log accounts and balances
+        run: |
+          docker exec geth-devnet geth --exec "eth.accounts.map(a => [a, eth.getBalance(a)])" attach http://localhost:8545
+
+
       - name: 🧪 Check Hardhat directory structure
         run: ls -R hardhat
 
