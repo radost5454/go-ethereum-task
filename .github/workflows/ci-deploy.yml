@@ -23,22 +23,20 @@ jobs:
               --dev \
               --datadir /tmp/devdatadir \
               --http --http.addr 0.0.0.0 --http.port 8545 \
-              --http.api eth,net,web3,personal \
-              --mine --miner.threads=1 --miner.gaslimit=12000000
+              --http.api eth,net,web3,personal 
 
       - name: Wait for Geth RPC to be available
         run: |
           echo "⌛ Waiting for Geth RPC..."
-          for i in {1..30}; do
+          for i in {1..10}; do
             if curl -s http://localhost:8545 >/dev/null; then
               echo "✅ Geth RPC is up!"
               break
             fi
-            echo "⏳ Still waiting for Geth RPC... ($i)"
+            echo "⏳ Still waiting for Geth RPC..."
             sleep 3
           done
           curl -s http://localhost:8545 || (echo "❌ Geth RPC did not respond" && exit 1)
-
 
       - name: Show dev account used by Geth
         run: |
@@ -69,7 +67,7 @@ jobs:
         env:
           HARDHAT_DEPLOYER_KEY: "0x59c6995e998f97a5a004497e5da0da3eb20c29e0cde8c3c2d20c3eab366d8e84"
         run: |
-          echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network localhost
+          echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth
 
       - name:  Check Geth devnet chain info
         run: |
