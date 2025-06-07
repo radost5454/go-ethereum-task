@@ -1,43 +1,57 @@
-name: Run Hardhat Tests
+name: Test Contracts Against Predeployed Devnet
 
 on:
   workflow_dispatch:
+  # pull_request:
+  #   branches:
+  #     - main
 
 jobs:
-  run_tests:
+  test_contracts:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Pull pre-deployed Geth image
-        run: docker pull ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
-
-      - name: Start Geth devnet with deployed contracts
+      - name: Pull predeployed devnet image
         run: |
-          docker run -d --name devnet -p 8545:8545 \
+          echo "Pulling image with deployed contracts..."
+          docker pull ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+
+      - name: Start Geth container with deployed contracts
+        run: |
+          echo "Starting devnet container..."
+          docker run -d --name geth-test -p 8545:8545 \
             ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts \
-            geth --http --http.addr 0.0.0.0 --http.port 8545 \
-                 --http.api eth,net,web3,txpool,personal \
-                 --dev --datadir /data
+            geth \
+              --dev \
+              --dev.period 1 \
+              --datadir /tmp/devdatadir \
+              --http --http.addr 0.0.0.0 --http.port 8545 \
+              --http.api eth,net,web3,personal \
+              --allow-insecure-unlock
 
-      - name: Wait for Geth
+      - name: Wait for Geth RPC to be available
         run: |
+          echo "⌛ Waiting for Geth RPC..."
           for i in {1..10}; do
-            curl -s http://localhost:8545 && break
-            echo "Waiting for Geth RPC..." && sleep 3
+            if curl -s http://localhost:8545 >/dev/null; then
+              echo "✅ Geth RPC is up!"
+              break
+            fi
+            echo "⏳ Still waiting for Geth RPC..."
+            sleep 3
           done
+          curl -s http://localhost:8545 || (echo "❌ Geth RPC did not respond" && exit 1)
 
-      - name: Download deployed address artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: lock-address
-
-      - name: Export LOCK_ADDRESS env variable
-        run: echo "LOCK_ADDRESS=$(cat lock-address.txt)" >> $GITHUB_ENV
-
-      - name: Run Hardhat test against predeployed contract
+      - name: Install Hardhat dependencies
         working-directory: hardhat
         run: |
-          npx hardhat test test/checkPredeployed.js --network devnet
+          npm install
+
+      - name: Run Hardhat tests against predeployed contracts
+        working-directory: hardhat
+        run: |
+          echo "Running tests..."
+          npx hardhat test --network geth
