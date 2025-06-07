@@ -72,17 +72,6 @@ jobs:
           })" attach http://localhost:8545
           sleep 5
 
-      # - name: 🪄 Trigger mining by sending dummy tx
-      #   run: |
-      #     echo "Sending dummy tx to mine block..."
-      #     docker exec geth-devnet geth --exec "eth.sendTransaction({
-      #       from: eth.accounts[0],
-      #       to: eth.accounts[0],
-      #       value: 1
-      #     })" attach http://localhost:8545
-      #     sleep 3
-
-
       - name: Check latest block number
         run: |
           echo "Checking latest block..."
