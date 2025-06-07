@@ -160,5 +160,5 @@ jobs:
         working-directory: hardhat
         run: |
           npx hardhat compile
-          npx mocha test/integration/Lock.integration.js
+          npx mocha test/test.js
 
