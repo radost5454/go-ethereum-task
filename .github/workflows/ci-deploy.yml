@@ -29,15 +29,16 @@ jobs:
       - name: Wait for Geth RPC to be available
         run: |
           echo "⌛ Waiting for Geth RPC..."
-          for i in {1..10}; do
+          for i in {1..30}; do
             if curl -s http://localhost:8545 >/dev/null; then
               echo "✅ Geth RPC is up!"
               break
             fi
-            echo "⏳ Still waiting for Geth RPC..."
+            echo "⏳ Still waiting for Geth RPC... ($i)"
             sleep 3
           done
           curl -s http://localhost:8545 || (echo "❌ Geth RPC did not respond" && exit 1)
+
 
       - name: Show dev account used by Geth
         run: |
