@@ -23,9 +23,7 @@ jobs:
               --dev \
               --datadir /tmp/devdatadir \
               --http --http.addr 0.0.0.0 --http.port 8545 \
-              --http.api eth,net,web3,personal \
-              --mine --miner.threads=1 --miner.etherbase=0x71562b71999873db5b286df957af199ec94617f7
-
+              --http.api eth,net,web3,personal 
 
 
       - name: Wait for Geth RPC to be available
@@ -73,6 +71,19 @@ jobs:
           })" attach http://localhost:8545
           sleep 5
 
+      - name: ⏱ Wait for block to confirm funding
+        run: |
+          echo "Waiting for block with funding..."
+          for i in {1..10}; do
+            BAL=$(docker exec geth-devnet geth --exec "eth.getBalance('0xe260c22167D6e68FDc9d465C3751c1224a3962D3')" attach http://localhost:8545)
+            echo "Balance: $BAL"
+            if [ "$BAL" != "0" ]; then
+              echo "✅ Funding confirmed."
+              break
+            fi
+            echo "⏳ Still waiting..."
+            sleep 2
+          done
 
 
       - name: Deploy contracts using Ignition
