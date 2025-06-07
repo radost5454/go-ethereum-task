@@ -2,9 +2,6 @@ name: Test Contracts Against Predeployed Devnet
 
 on:
   workflow_dispatch:
-  # pull_request:
-  #   branches:
-  #     - main
 
 jobs:
   test_contracts:
@@ -15,13 +12,10 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Pull predeployed devnet image
-        run: |
-          echo "Pulling image with deployed contracts..."
-          docker pull ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+        run: docker pull ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
 
-      - name: Start Geth container with deployed contracts
+      - name: Start Geth container
         run: |
-          echo "Starting devnet container..."
           docker run -d --name geth-test -p 8545:8545 \
             ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts \
             geth \
@@ -32,26 +26,29 @@ jobs:
               --http.api eth,net,web3,personal \
               --allow-insecure-unlock
 
-      - name: Wait for Geth RPC to be available
+      - name: Wait for Geth
         run: |
-          echo "⌛ Waiting for Geth RPC..."
           for i in {1..10}; do
             if curl -s http://localhost:8545 >/dev/null; then
-              echo "✅ Geth RPC is up!"
+              echo "✅ Geth is ready"
               break
             fi
-            echo "⏳ Still waiting for Geth RPC..."
             sleep 3
           done
-          curl -s http://localhost:8545 || (echo "❌ Geth RPC did not respond" && exit 1)
+
+      - name: Download contract address artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deployed-lock-address
+          path: hardhat
+
+      - name: Show contract address
+        run: cat hardhat/deployed-lock-address.txt
 
       - name: Install Hardhat dependencies
         working-directory: hardhat
-        run: |
-          npm install
+        run: npm install
 
-      - name: Run Hardhat tests against predeployed contracts
+      - name: Run integration tests
         working-directory: hardhat
-        run: |
-          echo "Running tests..."
-          npx hardhat test --network geth
+        run: npx hardhat test --network geth

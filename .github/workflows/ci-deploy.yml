@@ -114,3 +114,9 @@ jobs:
         run: |
           echo " Pushing image to GHCR..."
           docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+
+      - name: Save contract address as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployed-lock-address
+          path: deployed-lock-address.txt
