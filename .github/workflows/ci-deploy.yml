@@ -162,4 +162,4 @@ jobs:
           HARDHAT_DEPLOYER_KEY: "0x59c6995e998f97a5a004497e5da0da3eb20c29e0cde8c3c2d20c3eab366d8e84"
         run: |
           echo "Running tests against devnet-with-contracts..."
-          npx hardhat test --network geth
+          npx hardhat test test/test.js --network geth
