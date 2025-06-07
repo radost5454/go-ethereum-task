@@ -21,10 +21,11 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/go-ethereum:dev-latest \
             geth \
               --dev \
+              --dev.period 1 \
               --datadir /tmp/devdatadir \
               --http --http.addr 0.0.0.0 --http.port 8545 \
-              --http.api eth,net,web3,personal 
-
+              --http.api eth,net,web3,personal \
+              --allow-insecure-unlock
 
       - name: Wait for Geth RPC to be available
         run: |
@@ -82,12 +83,18 @@ jobs:
           sleep 3
 
 
+      - name: Check latest block number
+        run: |
+          echo "Checking latest block..."
+          docker exec geth-devnet geth --exec "eth.blockNumber" attach http://localhost:8545
+
+
       - name: Deploy contracts using Ignition
         working-directory: hardhat
         env:
           HARDHAT_DEPLOYER_KEY: "0x59c6995e998f97a5a004497e5da0da3eb20c29e0cde8c3c2d20c3eab366d8e84"
         run: |
-          echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth
+          echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth --verbose
 
       - name:  Check Geth devnet chain info
         run: |
