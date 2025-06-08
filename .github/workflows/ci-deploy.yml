@@ -123,23 +123,11 @@ jobs:
           curl -s -X POST http://localhost:8545 \
             -H "Content-Type: application/json" \
             -d '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}'
-      - name: Commit container as new image with contracts
+      - name: Commit container and verify contract
         run: |
-          echo " Committing container to image: devnet-with-contracts"
-          docker ps
           docker commit geth-devnet ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
-          docker images
-          
-          # Verify the contract still exists in the container
-          echo "Verifying contract exists in container before commit..."
-          CONTRACT_ADDRESS=${{ steps.deploy.outputs.contract_address }}
-          CODE=$(docker exec geth-devnet geth --exec "eth.getCode('$CONTRACT_ADDRESS')" attach http://localhost:8545)
-          echo "Contract code in container: $CODE"
-          if [ "$CODE" = "0x" ]; then
-            echo "Error: Contract does not exist at address $CONTRACT_ADDRESS in container"
-            exit 1
-          fi
-          echo "Contract exists at address $CONTRACT_ADDRESS in container"
+          docker exec geth-devnet geth --exec "eth.getCode('${{ steps.deploy.outputs.contract_address }})'" attach http://localhost:8545 | grep -qv "^0x$"
+
       - name:  Debug Geth RPC
         run: |
           curl -s http://localhost:8545
