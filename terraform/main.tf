@@ -77,12 +77,14 @@ resource "kubernetes_deployment" "go_ethereum" {
       }
 
       spec {
-
         container {
           name  = "go-ethereum"
           image = "ghcr.io/radost5454/go-ethereum:devnet-with-contracts"
           command = ["/bin/sh"]
-          args = ["-c", "geth --datadir /tmp/devdatadir --http --http.addr 0.0.0.0 --http.api eth,net,web3,personal --http.port 8545 --allow-insecure-unlock"]
+          args = [
+            "-c",
+            "geth --dev --dev.period 1 --datadir /tmp/devdatadir --http --http.addr 0.0.0.0 --http.api eth,net,web3,personal --http.port 8545 --allow-insecure-unlock"
+          ]
 
           port {
             container_port = 8545
