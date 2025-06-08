@@ -85,11 +85,15 @@ jobs:
         env:
           HARDHAT_DEPLOYER_KEY: "0x59c6995e998f97a5a004497e5da0da3eb20c29e0cde8c3c2d20c3eab366d8e84"
         run: |
-          echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth --verbose
-          # Get the deployed contract address from Ignition output
-          CONTRACT_ADDRESS=$(npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth --verbose | grep "LockModule#Lock" | awk '{print $3}')
+          # Run deployment and capture output
+          DEPLOY_OUTPUT=$(echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth --verbose)
+          echo "$DEPLOY_OUTPUT"
+          
+          # Extract contract address from output
+          CONTRACT_ADDRESS=$(echo "$DEPLOY_OUTPUT" | grep "LockModule#Lock" | awk '{print $3}')
           echo "contract_address=$CONTRACT_ADDRESS" >> $GITHUB_OUTPUT
           echo "Deployed contract address: $CONTRACT_ADDRESS"
+          
           # Save the address to a file for the test job
           echo "$CONTRACT_ADDRESS" > ../contract_address.txt
 
