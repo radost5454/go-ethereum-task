@@ -109,12 +109,6 @@ To set up the infrastructure using Terraform:
 
 7. **Important Notes**
    - Always review the plan before applying changes
-   - Keep your state file secure
-   - Follow the principle of least privilege for IAM roles
-   - Make sure all required APIs are enabled in your GCP project
-   - The project ID must be unique across all of Google Cloud
-   - Use your own credentials and project - do not use the original repository's credentials
-   - Make sure to update the GitHub token and username in your forked repository's secrets
    - For production environments, store the Terraform state file in a secure S3 bucket with versioning enabled
 
 For more detailed information about the infrastructure setup, refer to the `terraform/` directory.
