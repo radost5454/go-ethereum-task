@@ -222,6 +222,6 @@ jobs:
           HARDHAT_NETWORK: geth
           CONTRACT_ADDRESS: ${{ needs.deploy_contracts.outputs.contract_address }}
         run: |
-          echo " Running Hardhat tests against pre-deployed contracts..."
-          echo "Using contract address: $CONTRACT_ADDRESS"
-          npx hardhat test test/deploy-verify-geth.js --network geth
+          echo "Running Hardhat tests against pre-deployed contracts..."
+          echo "Contract address: $CONTRACT_ADDRESS"
+          npx hardhat test test/Lock.predeployed.js --network geth
