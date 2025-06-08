@@ -90,6 +90,14 @@ jobs:
           CONTRACT_ADDRESS=$(npx hardhat ignition show-deployment ./ignition/modules/Lock.js --network geth | grep "Lock" | awk '{print $2}')
           echo "contract_address=$CONTRACT_ADDRESS" >> $GITHUB_OUTPUT
           echo "Deployed contract address: $CONTRACT_ADDRESS"
+          # Save the address to a file for the test job
+          echo "$CONTRACT_ADDRESS" > contract_address.txt
+
+      - name: Upload contract address
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-address
+          path: contract_address.txt
 
       - name:  Check Geth devnet chain info
         run: |
@@ -130,6 +138,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Download contract address
+        uses: actions/download-artifact@v4
+        with:
+          name: contract-address
+
       - name: Start Geth devnet with pre-deployed contracts
         run: |
           echo "Starting Geth devnet with pre-deployed contracts..."
@@ -148,7 +161,9 @@ jobs:
           HARDHAT_NETWORK: geth
           HARDHAT_NODE_URL: http://localhost:8545
           HARDHAT_DEPLOYER_KEY: "0x59c6995e998f97a5a004497e5da0da3eb20c29e0cde8c3c2d20c3eab366d8e84"
-          CONTRACT_ADDRESS: ${{ needs.deploy_contracts.outputs.contract_address }}
+          CONTRACT_ADDRESS: ${{ steps.download.outputs.contract_address }}
         run: |
           echo " Running Hardhat tests against pre-deployed contracts..."
+          CONTRACT_ADDRESS=$(cat ../contract_address.txt)
+          echo "Using contract address: $CONTRACT_ADDRESS"
           npx hardhat test test/deploy-verify-geth.js --network geth
