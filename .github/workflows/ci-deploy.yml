@@ -101,9 +101,19 @@ jobs:
           echo "contract_address=$CONTRACT_ADDRESS" >> $GITHUB_OUTPUT
           echo "Deployed contract address: $CONTRACT_ADDRESS"
           
+          # Wait for contract deployment to be mined
+          echo "Waiting for contract deployment to be mined..."
+          sleep 5
+          
+          # Get the latest transaction receipt
+          echo "Getting latest transaction receipt..."
+          RECEIPT=$(docker exec geth-devnet geth --exec "eth.getTransactionReceipt(eth.getBlock('latest').transactions[0])" attach http://localhost:8545)
+          echo "Transaction receipt: $RECEIPT"
+          
           # Verify contract exists in the devnet
           echo "Verifying contract exists in devnet..."
           CODE=$(docker exec geth-devnet geth --exec "eth.getCode('$CONTRACT_ADDRESS')" attach http://localhost:8545)
+          echo "Contract code: $CODE"
           if [ "$CODE" = "0x" ]; then
             echo "Error: Contract does not exist at address $CONTRACT_ADDRESS"
             exit 1
@@ -134,6 +144,7 @@ jobs:
           echo "Verifying contract exists in container before commit..."
           CONTRACT_ADDRESS=${{ steps.deploy.outputs.contract_address }}
           CODE=$(docker exec geth-devnet geth --exec "eth.getCode('$CONTRACT_ADDRESS')" attach http://localhost:8545)
+          echo "Contract code in container: $CODE"
           if [ "$CODE" = "0x" ]; then
             echo "Error: Contract does not exist at address $CONTRACT_ADDRESS in container"
             exit 1
@@ -189,8 +200,15 @@ jobs:
           echo "Verifying contract exists in devnet..."
           CONTRACT_ADDRESS=${{ needs.deploy_contracts.outputs.contract_address }}
           echo "Checking contract at address: $CONTRACT_ADDRESS"
+          
+          # Get the latest block number
+          BLOCK_NUMBER=$(docker exec geth-devnet geth --exec "eth.blockNumber" attach http://localhost:8545)
+          echo "Current block number: $BLOCK_NUMBER"
+          
+          # Get the contract code
           CODE=$(docker exec geth-devnet geth --exec "eth.getCode('$CONTRACT_ADDRESS')" attach http://localhost:8545)
           echo "Contract code: $CODE"
+          
           if [ "$CODE" = "0x" ]; then
             echo "Error: Contract does not exist at address $CONTRACT_ADDRESS"
             exit 1
