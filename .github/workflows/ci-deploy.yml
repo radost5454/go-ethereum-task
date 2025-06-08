@@ -167,6 +167,18 @@ jobs:
           echo " Pushing image to GHCR..."
           docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
 
+      - name: Stop Geth devnet
+        run: docker stop geth-devnet
+
+      - name: Copy devdatadir out of container
+        run: docker cp geth-devnet:/tmp/devdatadir ./devdatadir
+
+      - name: Build new image with devdatadir
+        run: |
+          echo -e "FROM ghcr.io/${{ github.repository_owner }}/go-ethereum:dev-latest\nCOPY devdatadir /tmp/devdatadir" > Dockerfile.devnet
+          docker build -f Dockerfile.devnet -t ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts .
+          docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+
   test_contracts:
     needs: deploy_contracts
     runs-on: ubuntu-latest
@@ -178,9 +190,15 @@ jobs:
 
       - name: Start Geth devnet with pre-deployed contracts
         run: |
-          echo "Starting Geth devnet with pre-deployed contracts..."
           docker run -d --name geth-devnet -p 8545:8545 \
-            ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+            ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts \
+            geth \
+              --dev \
+              --dev.period 1 \
+              --datadir /tmp/devdatadir \
+              --http --http.addr 0.0.0.0 --http.port 8545 \
+              --http.api eth,net,web3,personal \
+              --allow-insecure-unlock
 
       - name: Wait for Geth RPC to be available
         run: |
