@@ -163,6 +163,8 @@ jobs:
 
       - name: Run Hardhat tests against deployed contracts
         working-directory: hardhat
+        env:
+          CONTRACT_ADDRESS: ${{ needs.deploy_contracts.outputs.contract_address }}
         run: |
-          echo "Running tests against predeployed contract..."
+          echo "Running tests against deployed contract at $CONTRACT_ADDRESS..."
           npx hardhat test test/deploy-verify-geth.js --network geth
