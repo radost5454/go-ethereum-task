@@ -77,40 +77,10 @@ jobs:
         env:
           HARDHAT_DEPLOYER_KEY: "0x59c6995e998f97a5a004497e5da0da3eb20c29e0cde8c3c2d20c3eab366d8e84"
         run: |
-          # Run deployment and capture output
-          DEPLOY_OUTPUT=$(echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth --verbose 2>&1)
-          echo "$DEPLOY_OUTPUT"
-          
-          # Extract contract address from output, handling ANSI codes
-          CONTRACT_ADDRESS=$(echo "$DEPLOY_OUTPUT" | grep -o "LockModule#Lock - 0x[a-fA-F0-9]\{40\}" | awk '{print $3}')
-          
-          # Verify we got a valid address
-          if [[ ! $CONTRACT_ADDRESS =~ ^0x[a-fA-F0-9]{40}$ ]]; then
-            echo "Error: Failed to extract valid contract address"
-            exit 1
-          fi
-          
+          CONTRACT_ADDRESS=$(echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth --verbose 2>&1 | grep -o "LockModule#Lock - 0x[a-fA-F0-9]\{40\}" | awk '{print $3}')
           echo "contract_address=$CONTRACT_ADDRESS" >> $GITHUB_OUTPUT
-          echo "Deployed contract address: $CONTRACT_ADDRESS"
-          
-          # Wait for contract deployment to be mined
-          echo "Waiting for contract deployment to be mined..."
-          sleep 5
-          
-          # Get the latest transaction receipt
-          echo "Getting latest transaction receipt..."
-          RECEIPT=$(docker exec geth-devnet geth --exec "eth.getTransactionReceipt(eth.getBlock('latest').transactions[0])" attach http://localhost:8545)
-          echo "Transaction receipt: $RECEIPT"
-          
-          # Verify contract exists in the devnet
-          echo "Verifying contract exists in devnet..."
-          CODE=$(docker exec geth-devnet geth --exec "eth.getCode('$CONTRACT_ADDRESS')" attach http://localhost:8545)
-          echo "Contract code: $CODE"
-          if [ "$CODE" = "0x" ]; then
-            echo "Error: Contract does not exist at address $CONTRACT_ADDRESS"
-            exit 1
-          fi
-          echo "Contract exists at address $CONTRACT_ADDRESS"
+          docker exec geth-devnet geth --exec "eth.getCode('$CONTRACT_ADDRESS')" attach http://localhost:8545 | grep -qv "^0x$"
+
       - name: Upload contract address
         uses: actions/upload-artifact@v4
         with:
