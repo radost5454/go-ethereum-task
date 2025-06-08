@@ -118,7 +118,8 @@ jobs:
   run_tests_against_deployed:
     needs: deploy_contracts
     runs-on: ubuntu-latest
-
+    env:
+      CONTRACT_ADDRESS: ${{ needs.deploy_contracts.outputs.contract_address }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
