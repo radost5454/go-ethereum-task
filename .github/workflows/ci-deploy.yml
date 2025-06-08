@@ -86,8 +86,8 @@ jobs:
           HARDHAT_DEPLOYER_KEY: "0x59c6995e998f97a5a004497e5da0da3eb20c29e0cde8c3c2d20c3eab366d8e84"
         run: |
           echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth --verbose
-          # Get the deployed contract address
-          CONTRACT_ADDRESS=$(docker exec geth-devnet geth --exec "eth.getTransactionReceipt(eth.getBlock('latest').transactions[0]).contractAddress" attach http://localhost:8545)
+          # Get the deployed contract address from Ignition output
+          CONTRACT_ADDRESS=$(npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth --verbose | grep "LockModule#Lock" | awk '{print $3}')
           echo "contract_address=$CONTRACT_ADDRESS" >> $GITHUB_OUTPUT
           echo "Deployed contract address: $CONTRACT_ADDRESS"
           # Save the address to a file for the test job
@@ -144,21 +144,13 @@ jobs:
           docker run -d --name geth-devnet -p 8545:8545 \
             ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
 
-      - name: Get deployed contract address
-        id: get_address
-        run: |
-          echo "Getting deployed contract address..."
-          CONTRACT_ADDRESS=$(docker exec geth-devnet geth --exec "eth.getTransactionReceipt(eth.getBlock('latest').transactions[0]).contractAddress" attach http://localhost:8545)
-          echo "CONTRACT_ADDRESS=$CONTRACT_ADDRESS" >> $GITHUB_ENV
-          echo "Using contract address: $CONTRACT_ADDRESS"
-
       - name: Run Hardhat tests against pre-deployed contracts
         working-directory: hardhat
         env:
           HARDHAT_NETWORK: geth
           HARDHAT_NODE_URL: http://localhost:8545
           HARDHAT_DEPLOYER_KEY: "0x59c6995e998f97a5a004497e5da0da3eb20c29e0cde8c3c2d20c3eab366d8e84"
-          CONTRACT_ADDRESS: ${{ env.CONTRACT_ADDRESS }}
+          CONTRACT_ADDRESS: ${{ needs.deploy_contracts.outputs.contract_address }}
         run: |
           echo " Running Hardhat tests against pre-deployed contracts..."
           echo "Using contract address: $CONTRACT_ADDRESS"
