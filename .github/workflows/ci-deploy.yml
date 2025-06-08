@@ -21,7 +21,7 @@ jobs:
             geth \
               --dev \
               --dev.period 1 \
-              --datadir /tmp/devdatadir \
+              --datadir /data/devdatadir \
               --http --http.addr 0.0.0.0 --http.port 8545 \
               --http.api eth,net,web3,personal \
               --allow-insecure-unlock
@@ -106,7 +106,7 @@ jobs:
             geth \
               --dev \
               --dev.period 1 \
-              --datadir /tmp/devdatadir \
+              --datadir /data/devdatadir \
               --http --http.addr 0.0.0.0 --http.port 8545 \
               --http.api eth,net,web3,personal \
               --allow-insecure-unlock
