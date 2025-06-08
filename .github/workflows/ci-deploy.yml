@@ -224,4 +224,4 @@ jobs:
         run: |
           echo "Running Hardhat tests against pre-deployed contracts..."
           echo "Contract address: $CONTRACT_ADDRESS"
-          npx hardhat test test/Lock.predeployed.js --network geth
+          npx hardhat test test/test.js --network geth
