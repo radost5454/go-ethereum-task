@@ -1,8 +1,6 @@
 name: Deploy Contracts to Devnet
 
 on:
-  # pull_request:
-  #   types: [closed]
   workflow_dispatch:
 
 jobs:
@@ -15,10 +13,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Start Geth devnet container
+      - name: Start Geth devnet container with mounted volume
         run: |
-          echo "Starting Geth devnet container..."
+          mkdir -p ${{ github.workspace }}/devdatadir
           docker run -d --name geth-devnet -p 8545:8545 \
+            -v ${{ github.workspace }}/devdatadir:/tmp/devdatadir \
             ghcr.io/${{ github.repository_owner }}/go-ethereum:dev-latest \
             geth \
               --dev \
@@ -30,12 +29,12 @@ jobs:
 
       - name: Wait for Geth RPC
         run: |
-          echo "⌛ Waiting for Geth RPC..."
           for i in {1..10}; do
             if curl -s http://localhost:8545 >/dev/null; then
-              echo "✅ Geth RPC is up!"
+              echo " Geth RPC is up!"
               break
             fi
+            echo " Waiting..."
             sleep 3
           done
 
@@ -47,7 +46,7 @@ jobs:
         working-directory: hardhat
         run: npx hardhat compile
 
-      - name: Fund deployer
+      - name: Fund deployer account
         run: |
           docker exec geth-devnet geth --exec "eth.sendTransaction({
             from: eth.accounts[0],
@@ -68,22 +67,11 @@ jobs:
         working-directory: hardhat
         run: |
           ADDRESS=$(grep -oE 'LockModule#Lock - 0x[a-fA-F0-9]{40}' deploy.log | grep -oE '0x[a-fA-F0-9]{40}' | head -1)
-          echo "✅ Extracted address: $ADDRESS"
+          echo " Extracted address: $ADDRESS"
           echo "contract_address=$ADDRESS" >> $GITHUB_OUTPUT
 
-      - name: Commit container to new image
-        run: |
-          docker commit geth-devnet ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push image with contracts
-        run: docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+      - name: Stop Geth container
+        run: docker stop geth-devnet
 
   run_tests_against_deployed:
     needs: deploy_contracts
@@ -95,13 +83,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Pull committed image
-        run: docker pull ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
-
-      - name: Start geth from committed image
+      - name: Start Geth with same data volume
         run: |
           docker run -d --name geth-test -p 8545:8545 \
-            ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts \
+            -v ${{ github.workspace }}/devdatadir:/tmp/devdatadir \
+            ghcr.io/${{ github.repository_owner }}/go-ethereum:dev-latest \
             geth \
               --dev \
               --dev.period 1 \
@@ -114,26 +100,32 @@ jobs:
         run: |
           for i in {1..10}; do
             if curl -s http://localhost:8545 >/dev/null; then
-              echo "✅ Geth is ready"
+              echo " Geth is ready"
               break
             fi
+            echo " Waiting..."
             sleep 3
           done
 
-      - name: Print contract address
+      - name: Confirm contract address is set
         run: |
           echo "🔍 CONTRACT_ADDRESS: $CONTRACT_ADDRESS"
           if [[ -z "$CONTRACT_ADDRESS" ]]; then
-            echo "❌ CONTRACT_ADDRESS is empty"
+            echo " CONTRACT_ADDRESS is empty"
             exit 1
           fi
 
       - name: Verify contract exists
         run: |
           echo "Checking if contract is deployed..."
-          curl -s -X POST http://localhost:8545 \
+          CODE=$(curl -s -X POST http://localhost:8545 \
             -H "Content-Type: application/json" \
-            -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getCode\",\"params\":[\"$CONTRACT_ADDRESS\", \"latest\"],\"id\":1}"
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getCode\",\"params\":[\"$CONTRACT_ADDRESS\", \"latest\"],\"id\":1}" | jq -r .result)
+          echo " Deployed bytecode: $CODE"
+          if [ "$CODE" = "0x" ]; then
+            echo "Contract not found on chain"
+            exit 1
+          fi
 
       - name: Install Hardhat dependencies
         working-directory: hardhat
