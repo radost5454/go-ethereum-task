@@ -1,8 +1,8 @@
-name: Deploy and Test Hardhat Contracts
+name: Deploy Contracts to Devnet
 
 on:
-  pull_request:
-    types: [closed]
+  # pull_request:
+  #   types: [closed]
   workflow_dispatch:
 
 jobs:
