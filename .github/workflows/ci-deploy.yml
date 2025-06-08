@@ -18,6 +18,7 @@ jobs:
 
       - name: Start Geth devnet container
         run: |
+          echo "Starting Geth devnet container..."
           docker run -d --name geth-devnet -p 8545:8545 \
             ghcr.io/${{ github.repository_owner }}/go-ethereum:dev-latest \
             geth \
@@ -30,34 +31,52 @@ jobs:
 
       - name: Wait for Geth RPC to be available
         run: |
+          echo "⌛ Waiting for Geth RPC..."
           for i in {1..10}; do
             if curl -s http://localhost:8545 >/dev/null; then
               echo "✅ Geth RPC is up!"
               break
             fi
+            echo "⏳ Still waiting for Geth RPC..."
             sleep 3
           done
-          curl -s http://localhost:8545 || exit 1
+          curl -s http://localhost:8545 || (echo " Geth RPC did not respond" && exit 1)
 
       - name: Show dev account used by Geth
-        run: docker exec geth-devnet geth --exec "eth.accounts" attach http://localhost:8545
+        run: |
+          echo "🔍 Listing dev accounts inside Geth container..."
+          docker exec geth-devnet geth --exec "eth.accounts" attach http://localhost:8545
+
+      - name: Check Hardhat directory structure
+        run: |
+          echo " Verifying hardhat project structure..."
+          ls -R hardhat
 
       - name: Install Hardhat dependencies
         working-directory: hardhat
-        run: npm install
+        run: |
+          echo " Installing dependencies..."
+          npm install
 
       - name: Compile contracts
         working-directory: hardhat
-        run: npx hardhat compile
-
-      - name: Fund the deployer from Geth default account
         run: |
+          echo " Compiling contracts..."
+          npx hardhat compile
+
+      - name:  Fund the deployer from Geth default account
+        run: |
+          echo "Funding deployer..."
           docker exec geth-devnet geth --exec "eth.sendTransaction({
             from: eth.accounts[0],
             to: '0xe260c22167D6e68FDc9d465C3751c1224a3962D3',
             value: web3.toWei(100, 'ether')
           })" attach http://localhost:8545
           sleep 5
+      - name: Check latest block number
+        run: |
+          echo "Checking latest block..."
+          docker exec geth-devnet geth --exec "eth.blockNumber" attach http://localhost:8545
 
       - name: Deploy contracts using Ignition
         id: deploy
@@ -67,7 +86,6 @@ jobs:
         run: |
           CONTRACT_ADDRESS=$(echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth --verbose 2>&1 | grep -o "LockModule#Lock - 0x[a-fA-F0-9]\{40\}" | awk '{print $3}')
           echo "contract_address=$CONTRACT_ADDRESS" >> $GITHUB_OUTPUT
-          echo "$CONTRACT_ADDRESS" > contract_address.txt
           docker exec geth-devnet geth --exec "eth.getCode('$CONTRACT_ADDRESS')" attach http://localhost:8545 | grep -qv "^0x$"
 
       - name: Upload contract address
@@ -76,6 +94,22 @@ jobs:
           name: contract-address
           path: contract_address.txt
 
+      - name:  Check Geth devnet chain info
+        run: |
+          echo "Chain ID:"
+          curl -s -X POST http://localhost:8545 \
+            -H "Content-Type: application/json" \
+            -d '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}'
+
+      - name: Commit container and verify contract
+        run: |
+          docker commit geth-devnet ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+          docker exec geth-devnet geth --exec "eth.getCode('${{ steps.deploy.outputs.contract_address }})'" attach http://localhost:8545 | grep -qv "^0x$"
+
+      - name:  Debug Geth RPC
+        run: |
+          curl -s http://localhost:8545
+  
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -83,20 +117,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Stop container and copy devdatadir
+      - name: Stop and extract devnet data
         run: |
           docker stop geth-devnet
           docker cp geth-devnet:/tmp/devdatadir ./devdatadir
 
-      - name: Build and push image with pre-deployed contracts
+      - name: Build and push image with devdatadir
         run: |
           echo -e "FROM ghcr.io/${{ github.repository_owner }}/go-ethereum:dev-latest\nCOPY devdatadir /tmp/devdatadir" > Dockerfile.devnet
-          docker build -f Dockerfile.devnet -t ghcr.io/${{ github.repository_owner }}/go-ethereum:${{ env.IMAGE_TAG }} .
-          docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:${{ env.IMAGE_TAG }}
+          docker build -f Dockerfile.devnet -t ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts .
+          docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
 
   test_contracts:
     needs: deploy_contracts
     runs-on: ubuntu-latest
+    # if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'CI:Deploy')
 
     steps:
       - name: Checkout code
@@ -105,7 +140,7 @@ jobs:
       - name: Start Geth devnet with pre-deployed contracts
         run: |
           docker run -d --name geth-devnet -p 8545:8545 \
-            ghcr.io/${{ github.repository_owner }}/go-ethereum:${{ env.IMAGE_TAG }} \
+            ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts \
             geth \
               --dev \
               --dev.period 1 \
@@ -116,14 +151,16 @@ jobs:
 
       - name: Wait for Geth RPC to be available
         run: |
+          echo "⌛ Waiting for Geth RPC..."
           for i in {1..10}; do
             if curl -s http://localhost:8545 >/dev/null; then
               echo "✅ Geth RPC is up!"
               break
             fi
+            echo "⏳ Still waiting for Geth RPC..."
             sleep 3
           done
-          curl -s http://localhost:8545 || exit 1
+          curl -s http://localhost:8545 || (echo " Geth RPC did not respond" && exit 1)
 
       - name: Run Hardhat tests against pre-deployed contracts
         working-directory: hardhat
@@ -131,5 +168,6 @@ jobs:
           HARDHAT_NETWORK: geth
           CONTRACT_ADDRESS: ${{ needs.deploy_contracts.outputs.contract_address }}
         run: |
-          echo "Running tests on: $CONTRACT_ADDRESS"
+          echo "Running Hardhat tests against pre-deployed contracts..."
+          echo "Contract address: $CONTRACT_ADDRESS"
           npx hardhat test test/test.js --network geth
