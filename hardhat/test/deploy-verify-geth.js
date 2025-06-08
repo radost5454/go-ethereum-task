@@ -19,6 +19,6 @@ describe("Lock - Geth Verification", function () {
     const unlockTime = await lock.unlockTime();
     console.log("📆 Unlock time:", unlockTime.toString());
 
-    expect(unlockTime).to.be.a("BigNumber");
+    expect(typeof unlockTime).to.equal("bigint");
   });
 });
