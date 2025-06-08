@@ -15,13 +15,12 @@ jobs:
 
       - name: Start Geth devnet container
         run: |
-          echo "Starting Geth devnet container..."
           docker run -d --name geth-devnet -p 8545:8545 \
             ghcr.io/${{ github.repository_owner }}/go-ethereum:dev-latest \
             geth \
               --dev \
               --dev.period 1 \
-              --datadir /data/devdatadir \
+              --datadir /tmp/devdatadir \
               --http --http.addr 0.0.0.0 --http.port 8545 \
               --http.api eth,net,web3,personal \
               --allow-insecure-unlock
@@ -54,7 +53,7 @@ jobs:
           })" attach http://localhost:8545
           sleep 3
 
-      - name: Deploy contracts with Ignition and capture address
+      - name: Deploy contracts and extract address
         id: extract
         working-directory: hardhat
         env:
@@ -69,10 +68,7 @@ jobs:
         run: |
           docker exec geth-devnet geth --exec "eth.getCode('${{ steps.extract.outputs.contract_address }}')" attach http://localhost:8545
 
-      - name: Wait to flush state
-        run: sleep 5
-
-      - name: Commit Geth devnet container as image
+      - name: Commit container to image
         run: |
           docker commit geth-devnet ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
 
@@ -86,7 +82,7 @@ jobs:
       - name: Push image
         run: docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
 
-  run_tests_against_deployed_image:
+  run_tests_against_deployed:
     needs: deploy_contracts
     runs-on: ubuntu-latest
     env:
@@ -96,45 +92,45 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Pull Docker image with deployed contracts
+      - name: Pull committed image
         run: docker pull ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
 
-      - name: Start Geth container from image
+      - name: Extract chain data directory
+        run: |
+          docker create --name extract ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+          docker cp extract:/tmp/devdatadir ./devdatadir
+          docker rm extract
+
+      - name: Start geth from image with saved state
         run: |
           docker run -d --name geth-test -p 8545:8545 \
+            -v ${{ github.workspace }}/devdatadir:/data \
             ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts \
             geth \
               --dev \
               --dev.period 1 \
-              --datadir /data/devdatadir \
+              --datadir /data \
               --http --http.addr 0.0.0.0 --http.port 8545 \
               --http.api eth,net,web3,personal \
               --allow-insecure-unlock
 
-      - name: Wait for Geth to be ready
+      - name: Wait for Geth
         run: |
           for i in {1..10}; do
             if curl -s http://localhost:8545 >/dev/null; then
-              echo "✅ Geth is up"
+              echo "✅ Geth is ready"
               break
             fi
             echo "Waiting for Geth..."
             sleep 3
           done
 
-      - name: Verify contract exists before testing
-        run: |
-          echo "Checking deployed contract at $CONTRACT_ADDRESS..."
-          curl -s -X POST http://localhost:8545 \
-            -H "Content-Type: application/json" \
-            -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getCode\",\"params\":[\"$CONTRACT_ADDRESS\", \"latest\"],\"id\":1}"
-
       - name: Install Hardhat dependencies
         working-directory: hardhat
         run: npm install
 
-      - name: Run Geth-compatible tests
+      - name: Run tests against deployed contract
         working-directory: hardhat
         run: |
-          echo "Testing contract at: $CONTRACT_ADDRESS"
+          echo "Testing contract at $CONTRACT_ADDRESS"
           npx hardhat test test/deploy-verify-geth.js --network geth
