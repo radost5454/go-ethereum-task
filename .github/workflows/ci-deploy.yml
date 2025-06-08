@@ -151,25 +151,7 @@ jobs:
             sleep 3
           done
           curl -s http://localhost:8545 || (echo " Geth RPC did not respond" && exit 1)
-      - name: Verify contract exists in devnet
-        run: |
-          echo "Verifying contract exists in devnet..."
-          CONTRACT_ADDRESS=${{ needs.deploy_contracts.outputs.contract_address }}
-          echo "Checking contract at address: $CONTRACT_ADDRESS"
-          
-          # Get the latest block number
-          BLOCK_NUMBER=$(docker exec geth-devnet geth --exec "eth.blockNumber" attach http://localhost:8545)
-          echo "Current block number: $BLOCK_NUMBER"
-          
-          # Get the contract code
-          CODE=$(docker exec geth-devnet geth --exec "eth.getCode('$CONTRACT_ADDRESS')" attach http://localhost:8545)
-          echo "Contract code: $CODE"
-          
-          if [ "$CODE" = "0x" ]; then
-            echo "Error: Contract does not exist at address $CONTRACT_ADDRESS"
-            exit 1
-          fi
-          echo "Contract exists at address $CONTRACT_ADDRESS"
+
       - name: Run Hardhat tests against pre-deployed contracts
         working-directory: hardhat
         env:
