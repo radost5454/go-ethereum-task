@@ -108,21 +108,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push new image
+      - name: Stop and extract devnet data
         run: |
-          echo " Pushing image to GHCR..."
-          docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
-      - name: Stop Geth devnet
-        run: docker stop geth-devnet
+          docker stop geth-devnet
+          docker cp geth-devnet:/tmp/devdatadir ./devdatadir
 
-      - name: Copy devdatadir out of container
-        run: docker cp geth-devnet:/tmp/devdatadir ./devdatadir
-
-      - name: Build new image with devdatadir
+      - name: Build and push image with devdatadir
         run: |
           echo -e "FROM ghcr.io/${{ github.repository_owner }}/go-ethereum:dev-latest\nCOPY devdatadir /tmp/devdatadir" > Dockerfile.devnet
           docker build -f Dockerfile.devnet -t ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts .
           docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+
   test_contracts:
     needs: deploy_contracts
     runs-on: ubuntu-latest
