@@ -114,3 +114,24 @@ jobs:
         run: |
           echo " Pushing image to GHCR..."
           docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+
+  run_tests_against_deployed_image:
+    needs: deploy_contracts
+    runs-on: ubuntu-latest
+    env:
+      CONTRACT_ADDRESS: "0xdFAfA0ba9Fa0fA513aBD0FE460bbd3c1b04b138c"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Add your steps to pull image and start Geth...
+
+      - name: Install Hardhat dependencies
+        working-directory: hardhat
+        run: npm install
+
+      - name: Run Geth-compatible tests
+        working-directory: hardhat
+        run: |
+          echo "Testing contract at: $CONTRACT_ADDRESS"
+          npx hardhat test test/deploy-verify-geth.js --network geth
