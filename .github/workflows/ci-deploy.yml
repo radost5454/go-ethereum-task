@@ -155,6 +155,30 @@ jobs:
           docker run -d --name geth-devnet -p 8545:8545 \
             ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
 
+      - name: Wait for Geth RPC to be available
+        run: |
+          echo "⌛ Waiting for Geth RPC..."
+          for i in {1..10}; do
+            if curl -s http://localhost:8545 >/dev/null; then
+              echo "✅ Geth RPC is up!"
+              break
+            fi
+            echo "⏳ Still waiting for Geth RPC..."
+            sleep 3
+          done
+          curl -s http://localhost:8545 || (echo " Geth RPC did not respond" && exit 1)
+
+      - name: Verify contract exists in devnet
+        run: |
+          echo "Verifying contract exists in devnet..."
+          CONTRACT_ADDRESS=${{ needs.deploy_contracts.outputs.contract_address }}
+          CODE=$(docker exec geth-devnet geth --exec "eth.getCode('$CONTRACT_ADDRESS')" attach http://localhost:8545)
+          if [ "$CODE" = "0x" ]; then
+            echo "Error: Contract does not exist at address $CONTRACT_ADDRESS"
+            exit 1
+          fi
+          echo "Contract exists at address $CONTRACT_ADDRESS"
+
       - name: Run Hardhat tests against pre-deployed contracts
         working-directory: hardhat
         env:
