@@ -165,4 +165,10 @@ jobs:
         run: |
           echo " Running Hardhat tests against pre-deployed contracts..."
           echo "Using contract address: $CONTRACT_ADDRESS"
+          
+          # Verify the contract exists and has the expected interface
+          echo "Verifying contract interface..."
+          npx hardhat verify-contract --address $CONTRACT_ADDRESS --contract Lock
+          
+          # Run the tests
           npx hardhat test test/deploy-verify-geth.js --network geth

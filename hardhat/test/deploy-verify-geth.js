@@ -7,7 +7,15 @@ describe("Lock - Geth Verification", function () {
     console.log("🔍 CONTRACT_ADDRESS from env:", contractAddress);
     expect(contractAddress).to.match(/^0x[a-fA-F0-9]{40}$/);
 
-    const lock = await ethers.getContractAt("Lock", contractAddress);
+    // Get the contract factory to ensure we have the correct ABI
+    const Lock = await ethers.getContractFactory("Lock");
+    const lock = await Lock.attach(contractAddress);
+    
+    // Verify the contract exists
+    const code = await ethers.provider.getCode(contractAddress);
+    expect(code).to.not.equal("0x", "Contract does not exist at the specified address");
+    
+    // Try to read the unlockTime
     const unlockTime = await lock.unlockTime();
     console.log("📆 Unlock time:", unlockTime.toString());
 
