@@ -82,60 +82,62 @@ jobs:
       - name: Push image
         run: docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
 
-  run_tests_against_deployed:
-    needs: deploy_contracts
-    runs-on: ubuntu-latest
-    env:
-      CONTRACT_ADDRESS: ${{ needs.deploy_contracts.outputs.contract_address }}
+run_tests_against_deployed:
+  needs: deploy_contracts
+  runs-on: ubuntu-latest
+  env:
+    CONTRACT_ADDRESS: ${{ needs.deploy_contracts.outputs.contract_address }}
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Pull committed image
-        run: docker pull ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+    - name: Pull committed image
+      run: docker pull ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
 
-      - name: Extract chain data directory
-        run: |
-          docker create --name extract ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
-          docker cp extract:/tmp/devdatadir ./devdatadir
-          docker rm extract
+    - name: Extract chain data directory
+      run: |
+        docker create --name extract ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+        docker cp extract:/tmp/devdatadir ./devdatadir
+        docker rm extract
 
-      - name: Start geth from image with saved state
-        run: |
-          docker run -d --name geth-test -p 8545:8545 \
-            -v ${{ github.workspace }}/devdatadir:/data \
-            ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts \
-            geth \
-               --datadir /data \
-              --http --http.addr 0.0.0.0 --http.port 8545 \
-              --http.api eth,net,web3,personal \
-              --allow-insecure-unlock
+    - name: Start geth from image with preserved chain state
+      run: |
+        docker run -d --name geth-test -p 8545:8545 \
+          -v ${{ github.workspace }}/devdatadir:/data \
+          ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts \
+          geth \
+            --datadir /data \
+            --http \
+            --http.addr 0.0.0.0 \
+            --http.port 8545 \
+            --http.api eth,net,web3,personal \
+            --allow-insecure-unlock
 
-      - name: Wait for Geth
-        run: |
-          for i in {1..10}; do
-            if curl -s http://localhost:8545 >/dev/null; then
-              echo "✅ Geth is ready"
-              break
-            fi
-            echo "Waiting for Geth..."
-            sleep 3
-          done
+    - name: Wait for Geth RPC
+      run: |
+        for i in {1..10}; do
+          if curl -s http://localhost:8545 >/dev/null; then
+            echo "✅ Geth is ready"
+            break
+          fi
+          echo "Waiting for Geth..."
+          sleep 3
+        done
 
-      - name: Confirm contract still exists
-        run: |
-          curl -s -X POST http://localhost:8545 \
-            -H "Content-Type: application/json" \
-            -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getCode\",\"params\":[\"$CONTRACT_ADDRESS\", \"latest\"],\"id\":1}"
+    - name: Confirm contract still exists
+      run: |
+        echo "Checking contract at $CONTRACT_ADDRESS"
+        curl -s -X POST http://localhost:8545 \
+          -H "Content-Type: application/json" \
+          -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getCode\",\"params\":[\"$CONTRACT_ADDRESS\", \"latest\"],\"id\":1}"
 
+    - name: Install Hardhat dependencies
+      working-directory: hardhat
+      run: npm install
 
-      - name: Install Hardhat dependencies
-        working-directory: hardhat
-        run: npm install
-
-      - name: Run tests against deployed contract
-        working-directory: hardhat
-        run: |
-          echo "Testing contract at $CONTRACT_ADDRESS"
-          npx hardhat test test/deploy-verify-geth.js --network geth
+    - name: Run Hardhat tests against deployed contract
+      working-directory: hardhat
+      run: |
+        echo "Testing contract at $CONTRACT_ADDRESS"
+        npx hardhat test test/deploy-verify-geth.js --network geth
