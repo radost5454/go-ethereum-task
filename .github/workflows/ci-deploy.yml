@@ -107,9 +107,7 @@ jobs:
             -v ${{ github.workspace }}/devdatadir:/data \
             ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts \
             geth \
-              --dev \
-              --dev.period 1 \
-              --datadir /data \
+               --datadir /data \
               --http --http.addr 0.0.0.0 --http.port 8545 \
               --http.api eth,net,web3,personal \
               --allow-insecure-unlock
@@ -124,6 +122,13 @@ jobs:
             echo "Waiting for Geth..."
             sleep 3
           done
+
+      - name: Confirm contract still exists
+        run: |
+          curl -s -X POST http://localhost:8545 \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getCode\",\"params\":[\"$CONTRACT_ADDRESS\", \"latest\"],\"id\":1}"
+
 
       - name: Install Hardhat dependencies
         working-directory: hardhat
