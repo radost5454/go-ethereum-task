@@ -15,7 +15,9 @@ jobs:
 
       - name: Start Geth devnet container
         run: |
+          mkdir -p ${{ github.workspace }}/devdatadir
           docker run -d --name geth-devnet -p 8545:8545 \
+            -v ${{ github.workspace }}/devdatadir:/tmp/devdatadir \
             ghcr.io/${{ github.repository_owner }}/go-ethereum:dev-latest \
             geth \
               --dev \
@@ -24,6 +26,7 @@ jobs:
               --http --http.addr 0.0.0.0 --http.port 8545 \
               --http.api eth,net,web3,personal \
               --allow-insecure-unlock
+
 
       - name: Wait for Geth RPC
         run: |
