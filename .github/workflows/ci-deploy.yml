@@ -86,11 +86,18 @@ jobs:
           HARDHAT_DEPLOYER_KEY: "0x59c6995e998f97a5a004497e5da0da3eb20c29e0cde8c3c2d20c3eab366d8e84"
         run: |
           # Run deployment and capture output
-          DEPLOY_OUTPUT=$(echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth --verbose)
+          DEPLOY_OUTPUT=$(echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth --verbose 2>&1)
           echo "$DEPLOY_OUTPUT"
           
-          # Extract contract address from output
-          CONTRACT_ADDRESS=$(echo "$DEPLOY_OUTPUT" | grep "LockModule#Lock" | awk '{print $3}')
+          # Extract contract address from output, handling ANSI codes
+          CONTRACT_ADDRESS=$(echo "$DEPLOY_OUTPUT" | grep -o "LockModule#Lock - 0x[a-fA-F0-9]\{40\}" | awk '{print $3}')
+          
+          # Verify we got a valid address
+          if [[ ! $CONTRACT_ADDRESS =~ ^0x[a-fA-F0-9]{40}$ ]]; then
+            echo "Error: Failed to extract valid contract address"
+            exit 1
+          fi
+          
           echo "contract_address=$CONTRACT_ADDRESS" >> $GITHUB_OUTPUT
           echo "Deployed contract address: $CONTRACT_ADDRESS"
           
