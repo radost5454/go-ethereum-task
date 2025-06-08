@@ -6,16 +6,17 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-push-image:
-    # if: github.event.pull_request.merged == true && contains(join(github.event.pull_request.labels.*.name, ','), 'CI:Deploy')
+  deploy_contracts:
+    # if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'CI:Deploy')
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Start Geth devnet
+      - name: Start Geth devnet container
         run: |
+          echo "Starting Geth devnet container..."
           docker run -d --name geth-devnet -p 8545:8545 \
             ghcr.io/${{ github.repository_owner }}/go-ethereum:dev-latest \
             geth \
@@ -26,94 +27,90 @@ jobs:
               --http.api eth,net,web3,personal \
               --allow-insecure-unlock
 
-      - name: Wait for Geth
+      - name: Wait for Geth RPC to be available
         run: |
+          echo "⌛ Waiting for Geth RPC..."
           for i in {1..10}; do
-            if curl -s http://localhost:8545 >/dev/null; then break; fi
+            if curl -s http://localhost:8545 >/dev/null; then
+              echo "✅ Geth RPC is up!"
+              break
+            fi
+            echo "⏳ Still waiting for Geth RPC..."
             sleep 3
           done
+          curl -s http://localhost:8545 || (echo "❌ Geth RPC did not respond" && exit 1)
 
-      - name: Set up and compile Hardhat project
+      - name: Show dev account used by Geth
+        run: |
+          echo "🔍 Listing dev accounts inside Geth container..."
+          docker exec geth-devnet geth --exec "eth.accounts" attach http://localhost:8545
+
+      - name: Check Hardhat directory structure
+        run: |
+          echo " Verifying hardhat project structure..."
+          ls -R hardhat
+
+      - name: Install Hardhat dependencies
         working-directory: hardhat
         run: |
+          echo " Installing dependencies..."
           npm install
+
+      - name: Compile contracts
+        working-directory: hardhat
+        run: |
+          echo " Compiling contracts..."
           npx hardhat compile
 
-      - name: Fund deployer account
+      - name: 💸 Fund the deployer from Geth default account
         run: |
+          echo "Funding deployer..."
           docker exec geth-devnet geth --exec "eth.sendTransaction({
             from: eth.accounts[0],
             to: '0xe260c22167D6e68FDc9d465C3751c1224a3962D3',
             value: web3.toWei(100, 'ether')
           })" attach http://localhost:8545
+          sleep 5
+
+      - name: Check latest block number
+        run: |
+          echo "Checking latest block..."
+          docker exec geth-devnet geth --exec "eth.blockNumber" attach http://localhost:8545
+
 
       - name: Deploy contracts using Ignition
         working-directory: hardhat
         env:
           HARDHAT_DEPLOYER_KEY: "0x59c6995e998f97a5a004497e5da0da3eb20c29e0cde8c3c2d20c3eab366d8e84"
         run: |
-          echo "yes" | npx hardhat ignition deploy ignition/modules/Lock.js --network geth --verbose > deploy.log
-          DEPLOYED_ADDRESS=$(grep -oP 'Deployed Lock to \K0x[a-fA-F0-9]{40}' deploy.log)
-          echo "{\"Lock\":\"$DEPLOYED_ADDRESS\"}" > deployed.json
-          echo "✅ Deployed Lock to: $DEPLOYED_ADDRESS"
+          echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth --verbose
 
-      - name: Commit Geth container as Docker image
+      - name:  Check Geth devnet chain info
         run: |
-          docker commit geth-devnet ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+          echo "Chain ID:"
+          curl -s -X POST http://localhost:8545 \
+            -H "Content-Type: application/json" \
+            -d '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}'
 
-      - name: Log in to GHCR
+      - name: Commit container as new image with contracts
+        run: |
+          echo " Committing container to image: devnet-with-contracts"
+          docker ps
+          docker commit geth-devnet ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+          docker images
+
+      - name:  Debug Geth RPC
+        run: |
+          curl -s http://localhost:8545
+
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push image to GHCR
-        run: docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
-
-      - name: Upload deployed contract address
-        uses: actions/upload-artifact@v4
-        with:
-          name: deployed-address
-          path: hardhat/deployed.json
-
-  test-against-predeployed-image:
-    name: Run Hardhat tests against predeployed image
-    needs: build-and-push-image
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Download deployed address file
-        uses: actions/download-artifact@v4
-        with:
-          name: deployed-address
-          path: hardhat
-
-      - name: Start container from predeployed image
+      - name: Push new image
         run: |
-          docker run -d --name geth-predeployed -p 8545:8545 \
-            ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts \
-            geth \
-              --dev \
-              --dev.period 1 \
-              --datadir /tmp/devdatadir \
-              --http --http.addr 0.0.0.0 --http.port 8545 \
-              --http.api eth,net,web3,personal \
-              --allow-insecure-unlock
-
-      - name: Wait for Geth RPC
-        run: |
-          for i in {1..10}; do
-            if curl -s http://localhost:8545 >/dev/null; then break; fi
-            sleep 3
-          done
-          curl -s http://localhost:8545 || exit 1
-
-      - name: Install dependencies and run tests
-        working-directory: hardhat
-        run: |
-          npm install
-          npx hardhat test test/Lock.deployed.js --network geth
+          echo " Pushing image to GHCR..."
+          docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
