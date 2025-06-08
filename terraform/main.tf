@@ -20,6 +20,9 @@ resource "google_compute_subnetwork" "gke_subnet" {
   }
 }
 
+
+
+
 module "gke" {
   source  = "terraform-google-modules/kubernetes-engine/google"
   version = "29.0.0"
@@ -74,17 +77,32 @@ resource "kubernetes_deployment" "go_ethereum" {
       }
 
       spec {
+
         container {
           name  = "go-ethereum"
           image = "ghcr.io/radost5454/go-ethereum:devnet-with-contracts"
+          command = ["/bin/sh"]
+          args = ["-c", "geth --datadir /tmp/devdatadir --http --http.addr 0.0.0.0 --http.api eth,net,web3,personal --http.port 8545 --allow-insecure-unlock"]
+
           port {
             container_port = 8545
           }
+
+          volume_mount {
+            mount_path = "/tmp/devdatadir"
+            name       = "devdata"
+          }
+        }
+
+        volume {
+          name = "devdata"
+          empty_dir {}
         }
       }
     }
   }
 }
+
 
 resource "kubernetes_service" "go_ethereum" {
   metadata {

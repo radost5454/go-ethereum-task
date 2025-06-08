@@ -1,9 +1,8 @@
 name: Deploy Contracts to Devnet
 
 on:
-  workflow_dispatch:
-  # pull_request:
-  #   types: [closed]
+  pull_request:
+    types: [closed]
 
 env:
   DEVNET_IMAGE: ghcr.io/${{ github.repository_owner }}/go-ethereum:dev-latest
@@ -13,6 +12,7 @@ env:
 
 jobs:
   deploy_contracts:
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'CI:Deploy')
     runs-on: ubuntu-latest
     outputs:
       contract_address: ${{ steps.deploy.outputs.contract_address }}

@@ -26,8 +26,3 @@ variable "github_token" {
   sensitive   = true
 }
 
-variable "image_tag" {
-  description = "The Docker image tag to deploy"
-  type        = string
-  default     = "ghcr.io/radost5454/go-ethereum:devnet-with-contracts"
-}
