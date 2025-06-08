@@ -9,6 +9,8 @@ jobs:
   deploy_contracts:
     # if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'CI:Deploy')
     runs-on: ubuntu-latest
+    outputs:
+      contract_address: ${{ steps.deploy.outputs.contract_address }}
 
     steps:
       - name: Checkout code
@@ -77,13 +79,17 @@ jobs:
           echo "Checking latest block..."
           docker exec geth-devnet geth --exec "eth.blockNumber" attach http://localhost:8545
 
-
       - name: Deploy contracts using Ignition
+        id: deploy
         working-directory: hardhat
         env:
           HARDHAT_DEPLOYER_KEY: "0x59c6995e998f97a5a004497e5da0da3eb20c29e0cde8c3c2d20c3eab366d8e84"
         run: |
           echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth --verbose
+          # Get the deployed contract address
+          CONTRACT_ADDRESS=$(npx hardhat ignition show-deployment ./ignition/modules/Lock.js --network geth | grep "Lock" | awk '{print $2}')
+          echo "contract_address=$CONTRACT_ADDRESS" >> $GITHUB_OUTPUT
+          echo "Deployed contract address: $CONTRACT_ADDRESS"
 
       - name:  Check Geth devnet chain info
         run: |
@@ -162,7 +168,7 @@ jobs:
           HARDHAT_NETWORK: geth
           HARDHAT_NODE_URL: http://localhost:8545
           HARDHAT_DEPLOYER_KEY: "0x59c6995e998f97a5a004497e5da0da3eb20c29e0cde8c3c2d20c3eab366d8e84"
-          CONTRACT_ADDRESS: "0x5FbDB2315678afecb367f032d93F642f64180aa3"  # This should be the address from the deployment step
+          CONTRACT_ADDRESS: ${{ needs.deploy_contracts.outputs.contract_address }}
         run: |
           echo " Running Hardhat tests against pre-deployed contracts..."
           npx hardhat test test/deploy-verify-geth.js --network geth
