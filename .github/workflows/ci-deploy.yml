@@ -149,20 +149,14 @@ jobs:
           docker run -d --name geth-devnet -p 8545:8545 \
             ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
 
-      - name: Install Hardhat dependencies
-        working-directory: hardhat
-        run: |
-          echo " Installing dependencies..."
-          npm install
-
       - name: Run Hardhat tests against pre-deployed contracts
         working-directory: hardhat
         env:
           HARDHAT_NETWORK: geth
           HARDHAT_NODE_URL: http://localhost:8545
           HARDHAT_DEPLOYER_KEY: "0x59c6995e998f97a5a004497e5da0da3eb20c29e0cde8c3c2d20c3eab366d8e84"
+          CONTRACT_ADDRESS: ${{ needs.deploy_contracts.outputs.contract_address }}
         run: |
           echo " Running Hardhat tests against pre-deployed contracts..."
-          CONTRACT_ADDRESS=$(cat ../contract_address.txt)
           echo "Using contract address: $CONTRACT_ADDRESS"
-          CONTRACT_ADDRESS=$CONTRACT_ADDRESS npx hardhat test test/deploy-verify-geth.js --network geth
+          npx hardhat test test/deploy-verify-geth.js --network geth
