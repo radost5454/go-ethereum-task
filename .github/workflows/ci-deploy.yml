@@ -134,27 +134,7 @@ jobs:
         run: |
           echo "Starting Geth devnet with pre-deployed contracts..."
           docker run -d --name geth-devnet -p 8545:8545 \
-            ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts \
-            geth \
-              --dev \
-              --dev.period 1 \
-              --datadir /tmp/devdatadir \
-              --http --http.addr 0.0.0.0 --http.port 8545 \
-              --http.api eth,net,web3,personal \
-              --allow-insecure-unlock
-
-      - name: Wait for Geth RPC to be available
-        run: |
-          echo "⌛ Waiting for Geth RPC..."
-          for i in {1..10}; do
-            if curl -s http://localhost:8545 >/dev/null; then
-              echo "✅ Geth RPC is up!"
-              break
-            fi
-            echo "⏳ Still waiting for Geth RPC..."
-            sleep 3
-          done
-          curl -s http://localhost:8545 || (echo " Geth RPC did not respond" && exit 1)
+            ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
 
       - name: Install Hardhat dependencies
         working-directory: hardhat
