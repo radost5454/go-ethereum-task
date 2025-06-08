@@ -3,21 +3,18 @@ name: Deploy Contracts to Devnet
 on:
   workflow_dispatch:
 
+
 jobs:
   deploy_contracts:
     runs-on: ubuntu-latest
-    outputs:
-      contract_address: ${{ steps.extract_address.outputs.contract_address }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Start Geth devnet container with mounted volume
+      - name: Start Geth devnet container
         run: |
-          mkdir -p ${{ github.workspace }}/devdatadir
           docker run -d --name geth-devnet -p 8545:8545 \
-            -v ${{ github.workspace }}/devdatadir:/tmp/devdatadir \
             ghcr.io/${{ github.repository_owner }}/go-ethereum:dev-latest \
             geth \
               --dev \
@@ -27,14 +24,13 @@ jobs:
               --http.api eth,net,web3,personal \
               --allow-insecure-unlock
 
-      - name: Wait for Geth RPC
+      - name: Wait for Geth RPC to be available
         run: |
           for i in {1..10}; do
             if curl -s http://localhost:8545 >/dev/null; then
-              echo " Geth RPC is up!"
+              echo "✅ Geth RPC is up!"
               break
             fi
-            echo " Waiting..."
             sleep 3
           done
 
@@ -46,7 +42,7 @@ jobs:
         working-directory: hardhat
         run: npx hardhat compile
 
-      - name: Fund deployer account
+      - name: Fund the deployer account
         run: |
           docker exec geth-devnet geth --exec "eth.sendTransaction({
             from: eth.accounts[0],
@@ -62,32 +58,38 @@ jobs:
         run: |
           echo "yes" | npx hardhat ignition deploy ./ignition/modules/Lock.js --network geth --verbose | tee deploy.log
 
-      - name: Extract contract address
-        id: extract_address
-        working-directory: hardhat
-        run: |
-          ADDRESS=$(grep -oE 'LockModule#Lock - 0x[a-fA-F0-9]{40}' deploy.log | grep -oE '0x[a-fA-F0-9]{40}' | head -1)
-          echo " Extracted address: $ADDRESS"
-          echo "contract_address=$ADDRESS" >> $GITHUB_OUTPUT
+      - name: Copy deploy log into container
+        run: docker cp hardhat/deploy.log geth-devnet:/deploy.log
 
-      - name: Stop Geth container
-        run: docker stop geth-devnet
+      - name: Commit container with deployed contracts
+        run: |
+          docker commit geth-devnet ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push devnet-with-contracts image
+        run: docker push ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
 
   run_tests_against_deployed:
     needs: deploy_contracts
     runs-on: ubuntu-latest
-    env:
-      CONTRACT_ADDRESS: ${{ needs.deploy_contracts.outputs.contract_address }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Start Geth with same data volume
+      - name: Pull pre-deployed image
+        run: docker pull ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+
+      - name: Start Geth from committed image
         run: |
           docker run -d --name geth-test -p 8545:8545 \
-            -v ${{ github.workspace }}/devdatadir:/tmp/devdatadir \
-            ghcr.io/${{ github.repository_owner }}/go-ethereum:dev-latest \
+            ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts \
             geth \
               --dev \
               --dev.period 1 \
@@ -96,45 +98,29 @@ jobs:
               --http.api eth,net,web3,personal \
               --allow-insecure-unlock
 
-      - name: Wait for Geth
+      - name: Wait for Geth to be ready
         run: |
           for i in {1..10}; do
             if curl -s http://localhost:8545 >/dev/null; then
-              echo " Geth is ready"
+              echo "✅ Geth is ready"
               break
             fi
-            echo " Waiting..."
             sleep 3
           done
 
-      - name: Confirm contract address is set
+      - name: Extract contract address from container log
         run: |
-          echo "🔍 CONTRACT_ADDRESS: $CONTRACT_ADDRESS"
-          if [[ -z "$CONTRACT_ADDRESS" ]]; then
-            echo " CONTRACT_ADDRESS is empty"
-            exit 1
-          fi
-
-      - name: Verify contract exists
-        run: |
-          echo "Checking if contract is deployed..."
-          CODE=$(curl -s -X POST http://localhost:8545 \
-            -H "Content-Type: application/json" \
-            -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getCode\",\"params\":[\"$CONTRACT_ADDRESS\", \"latest\"],\"id\":1}" | jq -r .result)
-          echo " Deployed bytecode: $CODE"
-          if [ "$CODE" = "0x" ]; then
-            echo "Contract not found on chain"
-            exit 1
-          fi
+          docker cp geth-test:/deploy.log ./deploy.log
+          ADDRESS=$(grep -oE 'LockModule#Lock - 0x[a-fA-F0-9]{40}' deploy.log | grep -oE '0x[a-fA-F0-9]{40}' | head -1)
+          echo "✅ Extracted address: $ADDRESS"
+          echo "CONTRACT_ADDRESS=$ADDRESS" >> $GITHUB_ENV
 
       - name: Install Hardhat dependencies
         working-directory: hardhat
         run: npm install
 
-      - name: Run Hardhat tests
+      - name: Run tests against deployed contract
         working-directory: hardhat
-        env:
-          CONTRACT_ADDRESS: ${{ needs.deploy_contracts.outputs.contract_address }}
         run: |
           echo "Running tests against $CONTRACT_ADDRESS"
           npx hardhat test test/deploy-verify-geth.js --network geth
