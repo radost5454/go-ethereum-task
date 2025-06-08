@@ -101,8 +101,14 @@ jobs:
           echo "contract_address=$CONTRACT_ADDRESS" >> $GITHUB_OUTPUT
           echo "Deployed contract address: $CONTRACT_ADDRESS"
           
-          # Save the address to a file for the test job
-          echo "$CONTRACT_ADDRESS" > ../contract_address.txt
+          # Verify contract exists in the devnet
+          echo "Verifying contract exists in devnet..."
+          CODE=$(docker exec geth-devnet geth --exec "eth.getCode('$CONTRACT_ADDRESS')" attach http://localhost:8545)
+          if [ "$CODE" = "0x" ]; then
+            echo "Error: Contract does not exist at address $CONTRACT_ADDRESS"
+            exit 1
+          fi
+          echo "Contract exists at address $CONTRACT_ADDRESS"
 
       - name: Upload contract address
         uses: actions/upload-artifact@v4
@@ -123,6 +129,16 @@ jobs:
           docker ps
           docker commit geth-devnet ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
           docker images
+          
+          # Verify the contract still exists in the container
+          echo "Verifying contract exists in container before commit..."
+          CONTRACT_ADDRESS=${{ steps.deploy.outputs.contract_address }}
+          CODE=$(docker exec geth-devnet geth --exec "eth.getCode('$CONTRACT_ADDRESS')" attach http://localhost:8545)
+          if [ "$CODE" = "0x" ]; then
+            echo "Error: Contract does not exist at address $CONTRACT_ADDRESS in container"
+            exit 1
+          fi
+          echo "Contract exists at address $CONTRACT_ADDRESS in container"
 
       - name:  Debug Geth RPC
         run: |
@@ -172,7 +188,9 @@ jobs:
         run: |
           echo "Verifying contract exists in devnet..."
           CONTRACT_ADDRESS=${{ needs.deploy_contracts.outputs.contract_address }}
+          echo "Checking contract at address: $CONTRACT_ADDRESS"
           CODE=$(docker exec geth-devnet geth --exec "eth.getCode('$CONTRACT_ADDRESS')" attach http://localhost:8545)
+          echo "Contract code: $CODE"
           if [ "$CODE" = "0x" ]; then
             echo "Error: Contract does not exist at address $CONTRACT_ADDRESS"
             exit 1
