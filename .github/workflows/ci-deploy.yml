@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy_contracts:
-    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'CI:Deploy')
+    # if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'CI:Deploy')
     runs-on: ubuntu-latest
     outputs:
       contract_address: ${{ steps.deploy.outputs.contract_address }}
