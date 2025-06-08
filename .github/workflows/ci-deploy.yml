@@ -156,11 +156,13 @@ jobs:
           echo " Installing dependencies..."
           npm install
 
-      - name: Get deployed contract addresses
+      - name: Get deployed contract address
+        id: get_contract
         run: |
-          echo "Getting deployed contract addresses..."
-          docker exec geth-devnet geth --exec "eth.accounts" attach http://localhost:8545
-          docker exec geth-devnet geth --exec "eth.getTransactionReceipt(web3.eth.getTransactionByBlock('latest', 0).hash)" attach http://localhost:8545
+          echo "Getting deployed contract address..."
+          CONTRACT_ADDRESS=$(docker exec geth-devnet geth --exec "eth.getTransactionReceipt(eth.getBlock('latest').transactions[0]).contractAddress" attach http://localhost:8545)
+          echo "Contract address: $CONTRACT_ADDRESS"
+          echo "CONTRACT_ADDRESS=$CONTRACT_ADDRESS" >> $GITHUB_ENV
 
       - name: Run Hardhat tests against pre-deployed contracts
         working-directory: hardhat
@@ -168,6 +170,7 @@ jobs:
           HARDHAT_NETWORK: geth
           HARDHAT_NODE_URL: http://localhost:8545
           HARDHAT_DEPLOYER_KEY: "0x59c6995e998f97a5a004497e5da0da3eb20c29e0cde8c3c2d20c3eab366d8e84"
+          CONTRACT_ADDRESS: ${{ env.CONTRACT_ADDRESS }}
         run: |
           echo " Running Hardhat tests against pre-deployed contracts..."
-          npx hardhat test --network geth
+          npx hardhat test test/deploy-verify-geth.js --network geth
