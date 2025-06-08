@@ -162,6 +162,16 @@ jobs:
         working-directory: hardhat
         run: npm install
 
+      - name: Print CONTRACT_ADDRESS
+        run: |
+          echo "🔍 CONTRACT_ADDRESS: $CONTRACT_ADDRESS"
+          if [[ -z "$CONTRACT_ADDRESS" ]]; then
+            echo "❌ CONTRACT_ADDRESS is empty"
+            exit 1
+          fi
+        env:
+          CONTRACT_ADDRESS: ${{ needs.deploy_contracts.outputs.contract_address }}
+
       - name: Run Hardhat tests against deployed contracts
         working-directory: hardhat
         env:
