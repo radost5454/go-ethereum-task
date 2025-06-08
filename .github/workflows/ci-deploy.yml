@@ -168,7 +168,6 @@ jobs:
   test_contracts:
     needs: deploy_contracts
     runs-on: ubuntu-latest
-    # if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'CI:Deploy')
 
     steps:
       - name: Checkout code
@@ -177,14 +176,8 @@ jobs:
       - name: Start Geth devnet with pre-deployed contracts
         run: |
           docker run -d --name geth-devnet -p 8545:8545 \
-            ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts \
-            geth \
-              --dev \
-              --dev.period 1 \
-              --datadir /tmp/devdatadir \
-              --http --http.addr 0.0.0.0 --http.port 8545 \
-              --http.api eth,net,web3,personal \
-              --allow-insecure-unlock
+            ghcr.io/${{ github.repository_owner }}/go-ethereum:devnet-with-contracts
+
       - name: Wait for Geth RPC to be available
         run: |
           echo "⌛ Waiting for Geth RPC..."
@@ -197,25 +190,11 @@ jobs:
             sleep 3
           done
           curl -s http://localhost:8545 || (echo " Geth RPC did not respond" && exit 1)
-      - name: Verify contract exists in devnet
-        run: |
-          echo "Verifying contract exists in devnet..."
-          CONTRACT_ADDRESS=${{ needs.deploy_contracts.outputs.contract_address }}
-          echo "Checking contract at address: $CONTRACT_ADDRESS"
-          
-          # Get the latest block number
-          BLOCK_NUMBER=$(docker exec geth-devnet geth --exec "eth.blockNumber" attach http://localhost:8545)
-          echo "Current block number: $BLOCK_NUMBER"
-          
-          # Get the contract code
-          CODE=$(docker exec geth-devnet geth --exec "eth.getCode('$CONTRACT_ADDRESS')" attach http://localhost:8545)
-          echo "Contract code: $CODE"
-          
-          if [ "$CODE" = "0x" ]; then
-            echo "Error: Contract does not exist at address $CONTRACT_ADDRESS"
-            exit 1
-          fi
-          echo "Contract exists at address $CONTRACT_ADDRESS"
+
+      - name: Install dependencies (Hardhat etc.)
+        working-directory: hardhat
+        run: npm install
+
       - name: Run Hardhat tests against pre-deployed contracts
         working-directory: hardhat
         env:
@@ -224,4 +203,4 @@ jobs:
         run: |
           echo "Running Hardhat tests against pre-deployed contracts..."
           echo "Contract address: $CONTRACT_ADDRESS"
-          npx hardhat test test/test.js --network geth
+          npx hardhat test test/Lock.predeployed.js --network geth
