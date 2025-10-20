@@ -263,6 +263,7 @@ resource "google_compute_disk_resource_policy_attachment" "snap_db_boot" {
 This configuration ensures that database data can be quickly restored to a previous state in case of system failure, corruption, or accidental deletion, providing an additional layer of **resilience and disaster recovery** to the overall infrastructure.
 
 
+---
 
 ### Testing the Deployment
 
