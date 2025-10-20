@@ -226,20 +226,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
   CMD curl -fsS http://localhost:${PORT}/healthz || exit 1
 ```
 
----
 
-### Combined Failover Scenarios
-
-The system provides both **proactive** (health-based restarts) and **reactive** (automatic restarts/migrations) recovery across multiple layers.
-
-| Failure Scenario | Detected By | Recovery Action | Downtime Impact |
-|------------------|-------------|------------------|-----------------|
-| **Flask App Process Crash** | Container-Optimized OS Healthcheck | Container-Optimized OS restarts the container | Minimal (seconds) |
-| **VM Instance Crash** | GCP Scheduler | GCP auto-restarts VM (`automatic_restart=true`) | Low |
-| **Host Hardware Failure** | GCP Hypervisor | Live migration to healthy host (`MIGRATE`) | None |
-| **PostgreSQL Container Crash** | Container-Optimized OS Runtime | Container restarted automatically | Minimal |
-| **NGINX (Load Balancer) Failure** | Container-Optimized OS Runtime | Container restarted automatically | Minimal |
-| **Application Becomes Unhealthy** | Healthcheck | Container-Optimized OS restarts container | Minimal |
 
 ---
 
