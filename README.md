@@ -228,19 +228,6 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
 
 
 
----
-
-### Summary of the Self-Healing Mechanism
-
-1. **Container Health** — `restartPolicy: Always` ensures the process always runs.  
-2. **VM Reliability** — GCP’s built-in auto-restart and live-migration provide hardware resilience.  
-3. **Layered Recovery** — Even if the VM fails, the container restarts once it’s back online.  
-4. **Continuous Availability** — The load balancer remains online and restores service within seconds.
-
-This combination provides robust, production-like **resiliency** using only **free-tier GCP resources** and open-source tooling.
-
----
-
 ### Testing the Deployment
 
 After running `terraform apply`, verify deployment status:
