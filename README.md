@@ -178,7 +178,6 @@ or (if the collaborator’s key isn’t imported yet):
 
 This infrastructure implements multi-layer resilience, automatic fail-over, and data recovery automation using a combination of GCP features and Container-Optimized OS restart policies.
 
-
 ### VM-Level Self-Healing (Compute Engine)
 
 Each Compute Engine VM (`web_server`, `load_balancer`, `postgres_database`) includes the following configuration:
@@ -224,6 +223,7 @@ Example from Dockerfile:
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
   CMD curl -fsS http://localhost:${PORT}/healthz || exit 1
 ```
+---
 
 ### Data Backup and Recovery (Automated Snapshots)
 
