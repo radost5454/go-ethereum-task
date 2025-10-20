@@ -177,7 +177,7 @@ or (if the collaborator’s key isn’t imported yet):
 ## Failover, Self-Healing, and Backup Automation
 
 This infrastructure implements multi-layer resilience, automatic fail-over, and data recovery automation using a combination of GCP features and Container-Optimized OS restart policies.
----
+
 
 ### VM-Level Self-Healing (Compute Engine)
 
