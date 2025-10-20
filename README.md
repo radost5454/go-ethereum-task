@@ -174,10 +174,9 @@ or (if the collaborator’s key isn’t imported yet):
 
 ---
 
-## Failover and Self-Healing Strategy
+## Failover, Self-Healing, and Backup Automation
 
-This infrastructure implements **multi-layer resilience and self-healing** using GCP instance scheduling and container-level restart policies.  
-
+This infrastructure implements multi-layer resilience, automatic fail-over, and data recovery automation using a combination of GCP features and Container-Optimized OS restart policies.
 ---
 
 ### VM-Level Self-Healing (Compute Engine)
@@ -226,6 +225,43 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
   CMD curl -fsS http://localhost:${PORT}/healthz || exit 1
 ```
 
+### Data Backup and Recovery (Automated Snapshots)
+
+The PostgreSQL database instance is protected with an automated **daily snapshot policy**, ensuring data durability and simplified recovery in case of corruption or accidental loss.
+
+```hcl
+resource "google_compute_resource_policy" "daily_snapshots" {
+  name   = "daily-snapshots"
+  region = var.region
+
+  snapshot_schedule_policy {
+    schedule {
+      daily_schedule {
+        days_in_cycle = 1
+        start_time    = "03:00" 
+      }
+    }
+
+    retention_policy {
+      max_retention_days    = 7
+      on_source_disk_delete = "KEEP_AUTO_SNAPSHOTS"
+    }
+  }
+}
+
+resource "google_compute_disk_resource_policy_attachment" "snap_db_boot" {
+  name = google_compute_resource_policy.daily_snapshots.name
+  disk = google_compute_instance.postgres_database.name
+  zone = "${var.region}-a"
+}
+```
+
+- **Daily Snapshot Schedule:** Automatically creates a snapshot of the PostgreSQL boot disk every day at **03:00 UTC**.  
+- **Retention Policy:** Keeps each snapshot for **7 days**, maintaining a rolling backup window.  
+- **Persistence:** Snapshots are **retained even if the source disk is deleted**, allowing full recovery of the database when needed.  
+
+This configuration ensures that database data can be quickly restored to a previous state in case of system failure, corruption, or accidental deletion, providing an additional layer of **resilience and disaster recovery** to the overall infrastructure.
+
 
 
 ### Testing the Deployment
@@ -245,6 +281,6 @@ curl http://<LOAD_BALANCER_IP>/db-check
 ```
 
 Expected responses:
-- `/` → `{"message":"The health check of the app is working which is with /"}`
-- `/healthz` → `ok of the healthz check`
+- `/` → `{"message":"Hello from the app"}`
+- `/healthz` → `ok`
 - `/db-check` → PostgreSQL version output
